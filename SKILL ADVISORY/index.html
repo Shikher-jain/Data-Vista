@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career Advisor Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-2xl">
+        <div id="advisor-container" class="transition-all duration-300">
+            <!-- Header -->
+            <div class="text-center mb-6">
+                <h1 class="text-4xl font-bold text-gray-800">Your Personal Career GPS</h1>
+                <p class="text-lg text-gray-500 mt-2">Let's find your path to success.</p>
+            </div>
+
+            <!-- Input Section -->
+            <div class="mb-6">
+                <label for="skills-input" class="block text-gray-700 text-sm font-semibold mb-2">Enter your skills (e.g., Python, SQL, Project Management):</label>
+                <textarea id="skills-input" rows="5" class="w-full p-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200" placeholder="e.g., Python, SQL, Data Analysis, JavaScript, Cloud Computing, Public Speaking"></textarea>
+            </div>
+            
+            <div class="text-center">
+                <button id="analyze-btn" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-full hover:bg-blue-700 transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Find My Career Path
+                </button>
+            </div>
+        </div>
+
+        <!-- Output Section -->
+        <div id="results-container" class="mt-8 hidden transition-all duration-300">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Your Personalized Roadmap</h2>
+            
+            <div id="career-result" class="bg-gray-50 p-6 rounded-lg shadow-sm mb-6 border border-gray-200">
+                <p class="text-gray-700 leading-relaxed"></p>
+            </div>
+
+            <div class="flex justify-center">
+                <button id="start-over-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-full hover:bg-gray-400 transition duration-200 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2">
+                    Start Over
+                </button>
+            </div>
+        </div>
+
+        <!-- Message Box for Alerts -->
+        <div id="message-box" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+            <div class="bg-white p-6 rounded-lg shadow-xl text-center">
+                <p class="text-lg font-semibold text-gray-800" id="message-text"></p>
+                <button id="message-ok-btn" class="mt-4 bg-blue-600 text-white py-2 px-4 rounded-full">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple data structure to mock our backend logic
+        const careerData = {
+            "data analysis": {
+                path: "Based on your skills, a strong career path for you is **Data Analyst** or **Data Scientist**.",
+                plan: "Your 30/60/90-day plan includes: **30 days** on SQL & Python basics; **60 days** on data visualization tools like Tableau/PowerBI; **90 days** on machine learning fundamentals."
+            },
+            "web development": {
+                path: "Given your skills, you are well-suited for a career in **Web Development**.",
+                plan: "Your 30/60/90-day plan includes: **30 days** on HTML/CSS; **60 days** on JavaScript and a framework like React/Angular; **90 days** on building a portfolio project."
+            },
+            "project management": {
+                path: "With your skills, a path in **Project Management** is a great fit.",
+                plan: "Your 30/60/90-day plan includes: **30 days** on Agile/Scrum methodologies; **60 days** on project planning tools like Jira; **90 days** on a certification like PMP."
+            }
+        };
+
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const startOverBtn = document.getElementById('start-over-btn');
+        const skillsInput = document.getElementById('skills-input');
+        const advisorContainer = document.getElementById('advisor-container');
+        const resultsContainer = document.getElementById('results-container');
+        const careerResult = document.getElementById('career-result');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const messageOkBtn = document.getElementById('message-ok-btn');
+
+        function showMessage(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+
+        analyzeBtn.addEventListener('click', () => {
+            const skills = skillsInput.value.toLowerCase();
+            if (skills.trim() === '') {
+                showMessage("Please enter your skills to get a recommendation.");
+                return;
+            }
+
+            let foundMatch = false;
+            let resultHtml = '';
+
+            for (const key in careerData) {
+                if (skills.includes(key)) {
+                    const data = careerData[key];
+                    resultHtml += `<div class="mb-4">
+                        <h3 class="font-bold text-gray-900 text-xl mb-2">Recommended Career Path</h3>
+                        <p class="text-gray-700">${data.path}</p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-xl mb-2">Personalized Learning Plan</h3>
+                        <p class="text-gray-700">${data.plan}</p>
+                    </div>`;
+                    foundMatch = true;
+                    break;
+                }
+            }
+
+            if (!foundMatch) {
+                resultHtml = `
+                    <p class="text-gray-700">We couldn't find a direct match for your skills. Please try adding more specific keywords like 'Python', 'SQL', 'Project Management', or 'JavaScript'.</p>
+                `;
+            }
+
+            careerResult.innerHTML = resultHtml;
+            advisorContainer.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+        });
+
+        startOverBtn.addEventListener('click', () => {
+            skillsInput.value = '';
+            resultsContainer.classList.add('hidden');
+            advisorContainer.classList.remove('hidden');
+        });
+        
+        messageOkBtn.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,27 @@
+1. Install Dependencies
+    pip install -r requirements.txt
+
+2. Register a Face
+    python register.py
+    Enter student name → Webcam opens → Capture 20 images → Window closes
+    Images saved in: student_images/<name>/
+
+3. Train Model
+    python train.py
+    Trains LBPH model → Saves face_model.yml and labels.pkl
+
+4. Mark Attendance
+    python mark_attendance.py
+    Webcam opens → Detects and identifies faces → Attendance saved to attendance.csv
+
+5. View CSV Log
+    Open attendance.csv in Excel or Notepad:
+
+    Name, Date, Time
+    Shikher, 2025-06-17, 11:32:00
+
+
+Add krna h
+
+GUI version chahiye with buttons
+Django/Flask-based web app

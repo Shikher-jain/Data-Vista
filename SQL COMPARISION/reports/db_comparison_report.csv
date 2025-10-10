@@ -1,0 +1,5 @@
+"Table","Issue","Column","Details","DB1 Info","DB2 Info"
+"departments","Missing in db2","","","",""
+"employees","Column missing in db2","email","VARCHAR(100)","False",""
+"orders","Column changed","amount","Type: FLOAT -> DECIMAL(10","FLOAT","DECIMAL(10"
+"orders","Column missing in db2","status","VARCHAR(20)","False",""
