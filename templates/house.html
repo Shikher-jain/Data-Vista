@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>House Prediction</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>House Price Prediction</h1>
+        {% if prediction %}
+            <div class="alert alert-success">
+                Predicted House Price: ${{ prediction }}
+            </div>
+        {% endif %}
+        <form method="POST">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="lot_area" class="form-label">Lot Area (sq ft)</label>
+                    <input type="number" class="form-control" id="lot_area" name="lot_area" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="year_built" class="form-label">Year Built</label>
+                    <input type="number" class="form-control" id="year_built" name="year_built" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="first_flr_sf" class="form-label">1st Floor SF</label>
+                    <input type="number" class="form-control" id="first_flr_sf" name="first_flr_sf" required>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <label for="second_flr_sf" class="form-label">2nd Floor SF</label>
+                    <input type="number" class="form-control" id="second_flr_sf" name="second_flr_sf" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="full_bath" class="form-label">Full Bathrooms</label>
+                    <input type="number" class="form-control" id="full_bath" name="full_bath" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="bedroom_abv_gr" class="form-label">Bedrooms Above Ground</label>
+                    <input type="number" class="form-control" id="bedroom_abv_gr" name="bedroom_abv_gr" required>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <label for="tot_rms_abv_grd" class="form-label">Total Rooms Above Ground</label>
+                    <input type="number" class="form-control" id="tot_rms_abv_grd" name="tot_rms_abv_grd" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="overall_qual" class="form-label">Overall Quality (1-10)</label>
+                    <input type="number" class="form-control" id="overall_qual" name="overall_qual" min="1" max="10" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="overall_cond" class="form-label">Overall Condition (1-10)</label>
+                    <input type="number" class="form-control" id="overall_cond" name="overall_cond" min="1" max="10" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">Predict Price</button>
+        </form>
+        <a href="/" class="btn btn-secondary mt-3">Back to Home</a>
+    </div>
+</body>
+</html>

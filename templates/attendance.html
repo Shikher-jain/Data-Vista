@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Attendance System{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h1>Attendance System</h1>
+        <p>{{ message }}</p>
+        <p>Note: This is a face recognition-based attendance system. To mark attendance, run the Python script locally.</p>
+        <video id="video" width="640" height="480" autoplay></video>
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <script>
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                })
+                .catch(err => {
+                    console.error('Error accessing camera: ', err);
+                });
+
+            // Basic face detection placeholder
+            // For actual recognition, need face-api.js or similar
+            video.addEventListener('play', () => {
+                setInterval(() => {
+                    context.drawImage(video, 0, 0, 640, 480);
+                    // Add face detection logic here
+                }, 100);
+            });
+        </script>
+    </div>
+{% endblock %}

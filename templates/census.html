@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}India Census{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h1>India Census Data</h1>
+        <form method="POST">
+            <div class="mb-3">
+                <label for="state" class="form-label">Select State</label>
+                <select class="form-select" id="state" name="state">
+                    <option value="Overall INDIA" {% if selected_state == 'Overall INDIA' %}selected{% endif %}>Overall INDIA</option>
+                    {% for state in states %}
+                    <option value="{{ state }}" {% if selected_state == state %}selected{% endif %}>{{ state }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Filter</button>
+        </form>
+        <div class="mt-4">
+            {{ df|safe }}
+        </div>
+        {% if map_html %}
+        <div class="mt-4">
+            {{ map_html|safe }}
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}

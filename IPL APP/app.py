@@ -1,10 +1,10 @@
 import streamlit as st
-st.set_page_config(page_title="IPL Stats Dashboard", layout="wide")
 
 import pandas as pd
 import numpy as np
 import ast
 
+st.set_page_config(page_title="IPL Stats Dashboard", layout="wide")
 # ------------------ Data Load ------------------
 matches = pd.read_csv("data/ipl-matches.csv")
 balls = pd.read_csv("data/ball.csv")

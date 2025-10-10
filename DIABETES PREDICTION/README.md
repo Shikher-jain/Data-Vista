@@ -7,11 +7,15 @@ In this project, our objective is to predict whether the patient has diabetes or
 
 > Read more about it in my [Blogpost](https://medium.com/@adityamankar09/building-a-diabetes-predictor-4702b99bc7e4).
 
+### Integration with Datavista
+
+This diabetes predictor is integrated into the Datavista platform. To access it, run the main Datavista Flask app and navigate to the Diabetes page.
+
 # **Screenshot**
 
 ![](screenshot.jpg)
 
-# Installation
+# Standalone Installation
 
 - Clone this repository and unzip it.
 
@@ -19,7 +23,7 @@ In this project, our objective is to predict whether the patient has diabetes or
 
 - Begin a new virtual environment with Python 3 and activate it.
 
-- Install the required packages using 
+- Install the required packages using
    `pip install -r requirements.txt`
 
 - Execute the command:
