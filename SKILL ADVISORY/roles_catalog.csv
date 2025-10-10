@@ -1,0 +1,7 @@
+role_id,role_title,role_description,required_skills
+1,Frontend Engineer,"Build UI and user-facing features using JS frameworks","html,css,javascript,react"
+2,Backend Engineer,"Implement APIs and services using Python/Java or Node","python,django,flask,sql"
+3,Data Scientist,"Analyze data and build models using ML libraries","python,pandas,numpy,sklearn,tensorflow,pytorch"
+4,DevOps Engineer,"CI/CD, infra automation, containers","docker,kubernetes,aws,git"
+5,QA Engineer,"Write tests and ensure product quality","testing,automation,pytest,selenium"
+6,Product Manager,"Define product requirements and roadmap","communication,product strategy,stakeholder management"
