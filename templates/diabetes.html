@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Diabetes Prediction{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h1>Diabetes Prediction</h1>
+        <form method="post">
+            <div class="mb-3">
+                <label for="glucose" class="form-label">Glucose</label>
+                <input type="text" class="form-control" id="glucose" name="glucose" required>
+            </div>
+            <div class="mb-3">
+                <label for="bloodpressure" class="form-label">Blood Pressure</label>
+                <input type="text" class="form-control" id="bloodpressure" name="bloodpressure" required>
+            </div>
+            <div class="mb-3">
+                <label for="insulin" class="form-label">Insulin</label>
+                <input type="text" class="form-control" id="insulin" name="insulin" required>
+            </div>
+            <div class="mb-3">
+                <label for="bmi" class="form-label">BMI</label>
+                <input type="text" class="form-control" id="bmi" name="bmi" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Predict</button>
+        </form>
+        {% if prediction_text %}
+        <div class="alert alert-info mt-3">{{ prediction_text }}</div>
+        {% endif %}
+    </div>
+{% endblock %}

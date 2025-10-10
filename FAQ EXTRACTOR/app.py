@@ -65,22 +65,6 @@ def looks_like_question(text: str) -> bool:
         )
     )
 
-def save_faqs_jsonl(faqs, filename):
-    with open(filename, "w", encoding="utf-8") as f:
-        for faq in faqs:
-            q = faq.get("question", "").strip()
-            a = faq.get("answer", "").strip()
-            if q and a:
-            
-                record = {
-                    "messages": [
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": q},
-                        {"role": "assistant", "content": a}
-                    ]
-                }    
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
 def fetch_url(url: str, timeout: int = 15) -> str:
     try:
         res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout)
@@ -490,10 +474,8 @@ def main():
         for faq in filtered:
             f.write(json.dumps(faq, ensure_ascii=False) + "\n")
 
-    save_faqs_jsonl(filtered, ft_file)
 
     print(f"Saved QnA FAQs : {qna_file}")
-    print(f"Saved Fine-tuning FAQs : {ft_file}")
 
 if __name__ == "__main__":
     main()

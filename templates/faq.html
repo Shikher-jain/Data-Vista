@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}FAQ Extractor{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h1>FAQ Extractor</h1>
+        {% if message %}
+        <p>{{ message }}</p>
+        <form method="POST">
+            <div class="mb-3">
+                <label for="url" class="form-label">Website URL</label>
+                <input type="url" class="form-control" id="url" name="url" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Extract FAQs</button>
+        </form>
+        {% endif %}
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+        {% if faqs %}
+        <h3>Extracted FAQs</h3>
+        <ul class="list-group">
+            {% for faq in faqs %}
+            <li class="list-group-item">
+                <strong>{{ faq.get('question', '') }}</strong><br>
+                {{ faq.get('answer', '') }}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+{% endblock %}
