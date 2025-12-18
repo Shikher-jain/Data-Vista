@@ -120,7 +120,7 @@ Data-Vista/
 ├── INDIA CENSUS/               # Census data analysis
 ├── IPL APP/                    # IPL statistics and analysis
 ├── SKILL ADVISORY/             # Career recommendation system
-├── SQL COMPARISION/            # SQL comparison utility
+├── SQL COMPARISON/             # SQL comparison utility
 └── WEATHER APP/                # Weather information service
 ```
 
@@ -136,7 +136,7 @@ Each subdirectory contains its own README with specific details:
 - **INDIA CENSUS**: Demographic analysis platform
 - **IPL APP**: Cricket statistics and analytics
 - **SKILL ADVISORY**: AI-powered career guidance
-- **SQL COMPARISION**: Database schema comparison tool
+- **SQL COMPARISON**: Database schema comparison tool
 - **WEATHER APP**: Weather forecast application
 
 ## 🎨 Features Highlights
