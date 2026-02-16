@@ -18,5 +18,4 @@ lxml
 sqlparse
 folium
 contractions
-
-# face-recognition
+joblib
