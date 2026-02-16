@@ -20,7 +20,5 @@ folium
 contractions
 joblib
 torch==2.10.0+cpu --find-links https://download.pytorch.org/whl/cpu/torch_stable.html
-torchvision==0.17.0+cpu
-torchaudio==2.2.0+cpu
 --extra-index-url https://download.pytorch.org/whl/cpu
 gunicorn
