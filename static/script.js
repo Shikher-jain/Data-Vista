@@ -30,46 +30,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    // Typing animation for hero title
+    // Typing animation for hero title (guarded for pages without the element)
     const typingText = document.getElementById('typing-text');
-    const text = "Welcome to Datavista";
-    let index = 0;
-    let isDeleting = false;
+    if (typingText) {
+        const text = "Welcome to Datavista";
+        let index = 0;
+        let isDeleting = false;
 
-    function typeWriter() {
-        if (!isDeleting) {
-            typingText.innerHTML = text.slice(0, index + 1);
-            index++;
-            if (index === text.length) {
-                isDeleting = true;
-                setTimeout(typeWriter, 2000); // Pause at end
-                return;
+        function typeWriter() {
+            if (!isDeleting) {
+                typingText.innerHTML = text.slice(0, index + 1);
+                index++;
+                if (index === text.length) {
+                    isDeleting = true;
+                    setTimeout(typeWriter, 2000); // Pause at end
+                    return;
+                }
+            } else {
+                typingText.innerHTML = text.slice(0, index);
+                index--;
+                if (index === 0) {
+                    isDeleting = false;
+                }
             }
-        } else {
-            typingText.innerHTML = text.slice(0, index);
-            index--;
-            if (index === 0) {
-                isDeleting = false;
-            }
+            setTimeout(typeWriter, isDeleting ? 100 : 150);
         }
-        setTimeout(typeWriter, isDeleting ? 100 : 150);
+
+        // Start typing animation after a delay
+        setTimeout(typeWriter, 1000);
+
+        // Interactive welcome text
+        typingText.addEventListener('mouseenter', () => {
+            typingText.classList.add('glow');
+        });
+        typingText.addEventListener('mouseleave', () => {
+            typingText.classList.remove('glow');
+        });
+        typingText.addEventListener('click', () => {
+            typingText.classList.add('pulse');
+            setTimeout(() => {
+                typingText.classList.remove('pulse');
+            }, 500);
+        });
     }
-
-    // Start typing animation after a delay
-    setTimeout(typeWriter, 1000);
-
-    // Interactive welcome text
-    const welcomeText = document.getElementById('typing-text');
-    welcomeText.addEventListener('mouseenter', () => {
-        welcomeText.classList.add('glow');
-    });
-    welcomeText.addEventListener('mouseleave', () => {
-        welcomeText.classList.remove('glow');
-    });
-    welcomeText.addEventListener('click', () => {
-        welcomeText.classList.add('pulse');
-        setTimeout(() => {
-            welcomeText.classList.remove('pulse');
-        }, 500);
-    });
 });

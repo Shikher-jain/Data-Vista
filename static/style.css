@@ -241,6 +241,57 @@ body {
     color: #e0e0e0;
 }
 
+.dark-mode .card,
+.dark-mode .table,
+.dark-mode .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+}
+
+.dark-mode .table-striped > tbody > tr:nth-of-type(even) > * {
+    background-color: #252525;
+    color: #e0e0e0;
+}
+
+.dark-mode .form-control,
+.dark-mode .form-select,
+.dark-mode input,
+.dark-mode textarea {
+    background-color: #1c1c1c;
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+.dark-mode .form-control:focus,
+.dark-mode .form-select:focus {
+    background-color: #1c1c1c;
+    color: #e0e0e0;
+    border-color: #4dabf7;
+    box-shadow: 0 0 0 0.2rem rgba(77, 171, 247, 0.25);
+}
+
+.dark-mode .btn-outline-danger {
+    color: #f28b82;
+    border-color: #f28b82;
+}
+
+.dark-mode .btn-outline-danger:hover {
+    background-color: #f28b82;
+    color: #1c1c1c;
+}
+
+.dark-mode .alert-info {
+    background-color: #103854;
+    color: #e0f2ff;
+    border-color: #1f4f73;
+}
+
+.dark-mode .alert-warning {
+    background-color: #4a3b17;
+    color: #ffe8a3;
+    border-color: #6b541f;
+}
+
 .dark-mode .card-container h3 {
     color: #4dabf7;
 }

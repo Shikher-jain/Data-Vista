@@ -5,10 +5,20 @@
 {% block content %}
     <div class="container mt-4">
         <h1>Attendance System</h1>
+        <a href="https://attendease-shikher-09.streamlit.app/" 
+        target="_blank" 
+        class="btn btn-success mb-3">
+        Open Attend-Ease App 
+        </a>
+        
+
+        
         <p>{{ message }}</p>
-        <p>Note: This is a face recognition-based attendance system. To mark attendance, run the Python script locally.</p>
+        <p>Note: The face-recognition flow lives in the StudentAttendance folder (register.py → train.py → mark_attendance.py). Run those locally to mark attendance.</p>
+
         <video id="video" width="640" height="480" autoplay></video>
         <canvas id="canvas" width="640" height="480"></canvas>
+        
         <script>
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');

@@ -1,13 +1,22 @@
 Flask
+fastapi
+uvicorn
+python-multipart
+jinja2
+python-dotenv
 pandas
 numpy
 scikit-learn
 plotly
 sentence-transformers
 streamlit
+watchdog
 opencv-python
-face-recognition
 requests
 beautifulsoup4
 lxml
 sqlparse
+folium
+contractions
+
+# face-recognition
