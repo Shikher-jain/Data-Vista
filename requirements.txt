@@ -11,7 +11,7 @@ plotly
 sentence-transformers
 streamlit
 watchdog
-opencv-python
+opencv-python-headless  # Replaced opencv-python with headless version to reduce size
 requests
 beautifulsoup4
 lxml
