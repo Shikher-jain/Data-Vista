@@ -2,9 +2,11 @@ import cv2
 import numpy as np
 import pickle
 import csv
+import os
 from datetime import datetime
 
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+# face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+face_cascade = cv2.CascadeClassifier(os.path.abspath('haarcascade_frontalface_default.xml'))
 model = cv2.face.LBPHFaceRecognizer_create()
 model.read("face_model.yml")
 

@@ -9,7 +9,7 @@ model = pickle.load(open('model.pkl', 'rb'))
 dataset = pd.read_csv('diabetes.csv')
 
 dataset_X = dataset.iloc[:,[1, 2, 5, 7]].values
-
+ 
 from sklearn.preprocessing import MinMaxScaler
 sc = MinMaxScaler(feature_range = (0,1))
 dataset_scaled = sc.fit_transform(dataset_X)

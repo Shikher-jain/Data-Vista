@@ -1,5 +1,12 @@
 import os
-os.environ['TRANSFORMERS_NO_TF'] = '1'
+from pathlib import Path
+import importlib.util
+import json
+from typing import List, Optional
+from dotenv import load_dotenv
+
+# Load environment variables from root .env
+load_dotenv()
 
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
@@ -15,16 +22,126 @@ import re
 from sentence_transformers import SentenceTransformer
 from sklearn.neighbors import NearestNeighbors
 import requests
-from dotenv import load_dotenv
 import warnings
 
 # Suppress pandas FutureWarning
 warnings.filterwarnings("ignore", category=FutureWarning, message=".*Series.__getitem__ treating keys as positions.*")
 
-# Load weather API key
-load_dotenv('WEATHER APP/.env')
-
 app = Flask(__name__)
+
+# Cached artifacts to avoid repeated heavy loads and to keep routes resilient
+role_model: Optional[SentenceTransformer] = None
+roles_df: Optional[pd.DataFrame] = None
+role_embeddings: Optional[np.ndarray] = None
+nn: Optional[NearestNeighbors] = None
+role_model_error: Optional[str] = None
+
+diabetes_model = None
+diabetes_scaler = None
+house_model = None
+faq_extractor_module = None
+
+STUDENT_MGMT_DIR = Path(__file__).resolve().parent / "Student_Management"
+STUDENT_MGMT_DATA = STUDENT_MGMT_DIR / "students.json"
+
+
+def ensure_role_data_loaded() -> bool:
+    """Lazily load role data and embeddings; keep feature available even if downloads fail."""
+    global roles_df, role_model, role_embeddings, nn, role_model_error
+
+    if roles_df is None:
+        try:
+            roles_df = pd.read_csv('SKILL ADVISORY/roles_catalog_large.csv', quotechar='"', on_bad_lines='skip')
+            roles_df.fillna("", inplace=True)
+        except Exception as exc:  # broad catch to keep app alive
+            role_model_error = f"Could not load roles catalog: {exc}"
+            return False
+
+    if role_model is None and role_model_error is None:
+        try:
+            role_model = SentenceTransformer("all-MiniLM-L6-v2", tokenizer_kwargs={"clean_up_tokenization_spaces": True})
+        except Exception as exc:  # pragma: no cover - protects against offline envs
+            role_model_error = f"Could not load sentence transformer: {exc}"
+            return False
+
+    if role_embeddings is None and role_model_error is None and role_model is not None:
+        try:
+            role_texts = (roles_df["role_title"] + ". " + roles_df["role_description"]).tolist()
+            role_embeddings = role_model.encode(role_texts, convert_to_numpy=True, show_progress_bar=False)
+            nn = NearestNeighbors(n_neighbors=min(5, len(role_embeddings)), metric="cosine")
+            nn.fit(role_embeddings)
+        except Exception as exc:
+            role_model_error = f"Could not build embeddings: {exc}"
+            return False
+
+    return role_model_error is None
+
+
+def load_diabetes_artifacts():
+    """Load diabetes model and scaler once; stay graceful if files are missing."""
+    global diabetes_model, diabetes_scaler
+    if diabetes_model is None or diabetes_scaler is None:
+        try:
+            diabetes_model = pickle.load(open('DIABETES PREDICTION/flask/model.pkl', 'rb'))
+            dataset = pd.read_csv('DIABETES PREDICTION/diabetes.csv')
+            diabetes_scaler = MinMaxScaler(feature_range=(0, 1))
+            diabetes_scaler.fit(dataset.iloc[:, [1, 2, 5, 7]].values)
+        except FileNotFoundError:
+            diabetes_model = None
+            diabetes_scaler = None
+    return diabetes_model, diabetes_scaler
+
+
+def load_house_model():
+    """Load house price model lazily; return None if unavailable."""
+    global house_model
+    if house_model is None:
+        try:
+            house_model = joblib.load('ADV HOUSE PREDICTION/house_model.pkl')
+        except FileNotFoundError:
+            house_model = None
+    return house_model
+
+
+def load_faq_extractor():
+    """Safely import FAQ extractor helpers from the subfolder with spaces."""
+    global faq_extractor_module
+    if faq_extractor_module is not None:
+        return faq_extractor_module, None
+
+    module_path = Path(__file__).resolve().parent / 'FAQ EXTRACTOR' / 'app.py'
+    if not module_path.exists():
+        return None, f"FAQ extractor module missing at {module_path}"
+
+    spec = importlib.util.spec_from_file_location('faq_extractor_module', module_path)
+    if spec is None or spec.loader is None:
+        return None, "Could not load FAQ extractor module specification"
+
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)  # type: ignore[attr-defined]
+        faq_extractor_module = module
+        return faq_extractor_module, None
+    except Exception as exc:  # pragma: no cover - keeps app alive even if parsing fails
+        return None, f"Could not import FAQ extractor: {exc}"
+
+
+def load_student_records():
+    if not STUDENT_MGMT_DATA.exists():
+        return {}, [], "students.json not found. Add a student to create it."
+    try:
+        with open(STUDENT_MGMT_DATA, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        items = sorted(({"name": k, "grade": v} for k, v in data.items()), key=lambda x: x["name"].lower())
+        return data, items, None
+    except Exception as exc:
+        return {}, [], f"Could not read students.json: {exc}"
+
+
+def save_student_records(data: dict):
+    STUDENT_MGMT_DATA.parent.mkdir(parents=True, exist_ok=True)
+    with open(STUDENT_MGMT_DATA, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
 def get_gdp_data():
     DATA_FILENAME = 'GDP DASHBOARD/data/gdp_data.csv'
@@ -102,7 +219,6 @@ def allRound(team):
     loss = mp - nr - won
     nt = df[(df.MatchNumber == 'Final') & (df.WinningTeam == team)].shape[0]
     win_rate = round(won / mp * 100, 2) if mp > 0 else 0
-
     return {
         'Matches Played': mp,
         'Won': won,
@@ -125,19 +241,16 @@ def batsmanrecord(name, df):
         return np.nan
     out = df[df.player_out == name].shape[0]
     df = df[df['batter'] == name]
-
     inngs = df.ID.unique().shape[0]
     runs = df.batsman_run.sum()
     fours = df[(df.batsman_run == 4) & (df.non_boundary == 0)].shape[0]
     sixes = df[(df.batsman_run == 6) & (df.non_boundary == 0)].shape[0]
-
     avg = runs / out if out else np.inf
     nballs = df[~df.extra_type.isin(['wides', 'noballs'])].shape[0]
     strike_rate = (runs / nballs * 100) if nballs else 0
     gb = df.groupby('ID').sum()
     fiftes = gb[(gb.batsman_run >= 50) & (gb.batsman_run < 100)].shape[0]
     hundreds = gb[gb.batsman_run >= 100].shape[0]
-
     if not gb.empty:
         highest_score = gb.batsman_run.max()
         highest_score_id = gb.batsman_run.idxmax()
@@ -148,10 +261,8 @@ def batsmanrecord(name, df):
             highest_score = str(highest_score)
     else:
         highest_score = np.nan
-
     not_out = inngs - out
     mom = df[df.Player_of_Match == name].drop_duplicates('ID', keep='first').shape[0]
-
     data = {
         'Innings': inngs,
         'Runs': runs,
@@ -239,21 +350,12 @@ def bowlerAPI(bowler, balls=bowler_data):
     data = {bowler: {'all': convert(self_record), 'Against': convert(against)}}
     return data
 
-# Skill Advisory Data
-model = SentenceTransformer("all-MiniLM-L6-v2", tokenizer_kwargs={"clean_up_tokenization_spaces": True})
-roles_df = pd.read_csv('SKILL ADVISORY/roles_catalog_large.csv', quotechar='"', on_bad_lines='skip')
-roles_df.fillna("", inplace=True)
-role_texts = (roles_df["role_title"] + ". " + roles_df["role_description"]).tolist()
-role_embeddings = model.encode(role_texts, convert_to_numpy=True, show_progress_bar=False)
-nn = NearestNeighbors(n_neighbors=min(5, len(role_embeddings)), metric="cosine")
-nn.fit(role_embeddings)
-
 def extract_skills(text, vocab=None):
     if vocab is None:
         vocab = [
-            "python","java","c++","react","node","django","flask","sql",
-            "tensorflow","pytorch","nlp","cloud","aws","docker","kubernetes",
-            "git","html","css","javascript","linux","azure","pandas","numpy"
+            "python", "java", "c++", "react", "node", "django", "flask", "sql",
+            "tensorflow", "pytorch", "nlp", "cloud", "aws", "docker", "kubernetes",
+            "git", "html", "css", "javascript", "linux", "azure", "pandas", "numpy"
         ]
     text_low = text.lower()
     found = []
@@ -291,12 +393,9 @@ def index():
 @app.route('/diabetes', methods=['GET', 'POST'])
 def diabetes():
     if request.method == 'POST':
-        # Load model
-        model = pickle.load(open('DIABETES PREDICTION/flask/model.pkl', 'rb'))
-        sc = MinMaxScaler(feature_range=(0,1))
-        dataset = pd.read_csv('DIABETES PREDICTION/diabetes.csv')
-        dataset_X = dataset.iloc[:,[1, 2, 5, 7]].values
-        sc.fit(dataset_X)  # Fit scaler
+        model, sc = load_diabetes_artifacts()
+        if model is None or sc is None:
+            return render_template('diabetes.html', prediction_text="Model artifacts are missing on the server.")
 
         float_features = [float(x) for x in request.form.values()]
         final_features = [np.array(float_features)]
@@ -433,6 +532,9 @@ def weather():
 @app.route('/skill', methods=['GET', 'POST'])
 def skill():
     if request.method == 'POST':
+        if not ensure_role_data_loaded():
+            return render_template('skill.html', error=role_model_error or "Skill advisory model is unavailable right now.")
+
         input_type = request.form.get('input_type')
         if input_type == 'Paste Resume':
             resume_text = request.form.get('resume_text', '')
@@ -447,14 +549,14 @@ def skill():
             return render_template('skill.html', error="Please provide resume text or skills.")
 
         skill_sentence = ", ".join(user_skills)
-        user_emb = model.encode([skill_sentence], convert_to_numpy=True)
+        user_emb = role_model.encode([skill_sentence], convert_to_numpy=True)
 
         distances, idxs = nn.kneighbors(user_emb, n_neighbors=min(5, len(role_embeddings)))
         recommendations = []
         for dist, idx in zip(distances[0], idxs[0]):
             score = 1 - float(dist)
             role = roles_df.iloc[idx]
-            required = [s.strip().lower() for s in str(role.get("required_skills","")).split(",") if s.strip()]
+            required = [s.strip().lower() for s in str(role.get("required_skills", "")).split(",") if s.strip()]
             missing = [s for s in required if s not in [x.lower().strip() for x in user_skills]]
 
             plan = generate_learning_plan(role["role_title"], missing)
@@ -476,22 +578,14 @@ def census():
     states = sorted(df['State'].unique())
     selected_state = request.form.get('state', 'Overall INDIA') if request.method == 'POST' else 'Overall INDIA'
     if selected_state == 'Overall INDIA':
-        state_pop = df.groupby('State')['Population'].sum().reset_index()
+        state_data = df.groupby('State').agg({'Population': 'sum', 'Latitude': 'mean', 'Longitude': 'mean'}).reset_index()
         import folium
         folium_map = folium.Map(location=[20.5937, 78.9629], zoom_start=5)
-        geojson_url = 'https://raw.githubusercontent.com/datameet/india-states/master/states.geojson'
-        folium.Choropleth(
-            geo_data=geojson_url,
-            name='choropleth',
-            data=state_pop,
-            columns=['State', 'Population'],
-            key_on='feature.properties.NAME_1',
-            fill_color='YlGnBu',
-            fill_opacity=0.7,
-            line_opacity=0.2,
-            legend_name='Population'
-        ).add_to(folium_map)
-        folium.LayerControl().add_to(folium_map)
+        for _, row in state_data.iterrows():
+            folium.Marker(
+                location=[row['Latitude'], row['Longitude']],
+                popup=f"{row['State']}: {row['Population']:,}"
+            ).add_to(folium_map)
         map_html = folium_map._repr_html_()
         filtered_df = df.head(20)  # Overall, show top 20 districts
     else:
@@ -510,7 +604,53 @@ def census():
 # Attendance System route
 @app.route('/attendance')
 def attendance():
-    return render_template('attendance.html', message="Attendance System: Face recognition based.")
+    msg = (
+        "Use the StudentAttendance module (register, train, then mark_attendance) from the StudentAttendance folder. "
+        "This page provides the Streamlit link and local-camera preview only."
+    )
+    return render_template('attendance.html', message=msg)
+
+
+@app.route('/students', methods=['GET', 'POST'])
+def student_management():
+    data, records, error = load_student_records()
+    message = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        name = (request.form.get('name') or '').strip()
+
+        if action == 'add':
+            grade_raw = request.form.get('grade')
+            if not name or grade_raw is None or grade_raw == '':
+                message = "Name and grade are required."
+            else:
+                try:
+                    grade = float(grade_raw)
+                    data[name] = grade
+                    save_student_records(data)
+                    message = f"Saved {name}."
+                except ValueError:
+                    message = "Grade must be a number."
+        elif action == 'delete':
+            if name in data:
+                data.pop(name, None)
+                save_student_records(data)
+                message = f"Deleted {name}."
+            else:
+                message = f"{name} not found."
+
+        data, records, error = load_student_records()
+
+    return render_template(
+        'student_management.html',
+        records=records,
+        error=error,
+        message=message,
+        data_file=str(STUDENT_MGMT_DATA),
+        streamlit_cmd="streamlit run Student_Management/stud_managementSTREAMLIT.py",
+        tkinter_cmd="python Student_Management/stud_managementTK.py",
+    )
 
 # House Prediction route
 @app.route('/house', methods=['GET', 'POST'])
@@ -544,8 +684,10 @@ def house():
         imputer = SimpleImputer(strategy='median')
         input_data = pd.DataFrame(imputer.fit_transform(input_data), columns=input_data.columns)
 
-        # Load model
-        model = joblib.load('ADV HOUSE PREDICTION/house_model.pkl')
+        # Load model once and reuse
+        model = load_house_model()
+        if model is None:
+            return render_template('house.html', prediction="Model file is missing on the server.")
 
         # Predict
         prediction = model.predict(input_data)[0]
@@ -578,16 +720,16 @@ def faq():
         if not url:
             return render_template('faq.html', error="Please provide a URL.")
         try:
-            # Simple extraction, import from FAQ EXTRACTOR
-            import sys
-            sys.path.insert(0, 'FAQ_EXTRACTOR')
-            from app import fetch_url, extract_faqs_from_html
-            html = fetch_url(url)
-            faqs = extract_faqs_from_html(html)
+            extractor, err = load_faq_extractor()
+            if err:
+                return render_template('faq.html', error=err)
+
+            html = extractor.fetch_url(url)
+            faqs = extractor.extract_faqs_from_html(html)
             return render_template('faq.html', faqs=faqs[:10])  # Limit to 10
         except Exception as e:
             return render_template('faq.html', error=f"Error extracting FAQs: {e}")
     return render_template('faq.html', message="Enter a URL to extract FAQs from websites.")
 
 if __name__ == "__main__":
-    app.run(debug=True) 
+    app.run(debug=True)
