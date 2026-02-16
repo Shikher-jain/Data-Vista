@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # Load environment variables from root .env
 load_dotenv()
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import pandas as pd
 import numpy as np
 import pickle
@@ -417,6 +417,10 @@ def generate_learning_plan(role_title, missing_skills):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(app.static_folder, 'favicon.ico')
 
 # Diabetes route
 @app.route('/diabetes', methods=['GET', 'POST'])
