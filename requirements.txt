@@ -10,7 +10,6 @@ scikit-learn
 plotly
 sentence-transformers
 streamlit
-watchdog
 opencv-python-headless  # Replaced opencv-python with headless version to reduce size
 requests
 beautifulsoup4
