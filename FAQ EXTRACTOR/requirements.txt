@@ -1,9 +1,0 @@
-streamlit
-requests
-beautifulsoup4
-lxml
-tldextract
-sentence-transformers
-torch
-transformers
-contractions
