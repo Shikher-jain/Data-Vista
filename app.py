@@ -48,7 +48,10 @@ STUDENT_MGMT_DATA = STUDENT_MGMT_DIR / "students.json"
 def ensure_role_data_loaded() -> bool:
     """Lazily load role data and embeddings; keep feature available even if downloads fail."""
     global roles_df, role_model, role_embeddings, nn, role_model_error
-
+    
+    # Check if we're in a serverless environment and skip heavy model loading
+    is_serverless = os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+    
     if roles_df is None:
         try:
             roles_df = pd.read_csv('SKILL ADVISORY/roles_catalog_large.csv', quotechar='"', on_bad_lines='skip')
@@ -58,6 +61,9 @@ def ensure_role_data_loaded() -> bool:
             return False
 
     if role_model is None and role_model_error is None:
+        if is_serverless:
+            role_model_error = "Sentence transformers disabled in serverless environment to conserve memory."
+            return False
         try:
             role_model = SentenceTransformer("all-MiniLM-L6-v2", tokenizer_kwargs={"clean_up_tokenization_spaces": True})
         except Exception as exc:  # pragma: no cover - protects against offline envs
@@ -157,23 +163,55 @@ def get_gdp_data():
     gdp_df['Year'] = pd.to_numeric(gdp_df['Year'])
     return gdp_df
 
-# IPL Data
-matches = pd.read_csv('IPL APP/data/ipl-matches.csv')
-balls = pd.read_csv('IPL APP/data/ball.csv')
+# IPL Data - Lazy loading to avoid memory issues on deployment
+matches = None
+balls = None
+all_players = None
+batter_data = None
+bowler_data = None
 
-# Safely get all unique players from the 'Team1Players' column
-s = matches["Team1Players"].sum()
-parts = s.split("][")
-parts = [p if p.startswith("[") else "[" + p for p in parts]
-parts = [p if p.endswith("]") else p + "]" for p in parts]
-lists = [ast.literal_eval(p) for p in parts]
-all_players = sorted(set(sum(lists, [])))
-
-# Merge ball-by-ball data with match info for detailed analysis
-ball_withmatch = balls.merge(matches, on='ID', how='inner').copy()
-ball_withmatch['BowlingTeam'] = ball_withmatch.Team1 + ball_withmatch.Team2
-ball_withmatch['BowlingTeam'] = ball_withmatch[['BowlingTeam', 'BattingTeam']].apply(lambda x: x.values[0].replace(x.values[1], ''), axis=1)
-batter_data = ball_withmatch[np.append(balls.columns.values, ['BowlingTeam', 'Player_of_Match'])]
+def load_ipl_data():
+    """Lazily load IPL data only when needed to avoid memory issues."""
+    global matches, balls, all_players, batter_data, bowler_data
+    
+    if matches is None or balls is None:
+        matches = pd.read_csv('IPL APP/data/ipl-matches.csv')
+        balls = pd.read_csv('IPL APP/data/ball.csv')
+        
+        # Safely get all unique players from the 'Team1Players' column
+        s = matches["Team1Players"].sum()
+        parts = s.split("][")
+        parts = [p if p.startswith("[") else "[" + p for p in parts]
+        parts = [p if p.endswith("]") else p + "]" for p in parts]
+        lists = [ast.literal_eval(p) for p in parts]
+        all_players = sorted(set(sum(lists, [])))
+        
+        # Merge ball-by-ball data with match info for detailed analysis
+        ball_withmatch = balls.merge(matches, on='ID', how='inner').copy()
+        ball_withmatch['BowlingTeam'] = ball_withmatch.Team1 + ball_withmatch.Team2
+        ball_withmatch['BowlingTeam'] = ball_withmatch[['BowlingTeam', 'BattingTeam']].apply(lambda x: x.values[0].replace(x.values[1], ''), axis=1)
+        batter_data = ball_withmatch[np.append(balls.columns.values, ['BowlingTeam', 'Player_of_Match'])]
+        
+        # Bowler Data
+        bowler_data = batter_data.copy()
+        
+        def bowlerRun(x):
+            if x[0] in ['penalty', 'legbyes', 'byes']:
+                return 0
+            else:
+                return x[1]
+        
+        bowler_data['bowler_run'] = bowler_data[['extra_type', 'total_run']].apply(bowlerRun, axis=1)
+        
+        def bowlerWicket(x):
+            if x[0] in ['caught', 'caught and bowled', 'bowled', 'stumped', 'lbw', 'hit wicket']:
+                return x[1]
+            else:
+                return 0
+        
+        bowler_data['isBowlerWicket'] = bowler_data[['kind', 'isWicketDelivery']].apply(bowlerWicket, axis=1)
+    
+    return matches, balls, all_players, batter_data, bowler_data
 
 # Helper Functions for IPL
 def convert(obj):
@@ -189,10 +227,12 @@ def convert(obj):
         return obj
 
 def teamsAPI():
+    load_ipl_data()
     teams = sorted(set(matches['Team1']).union(set(matches['Team2'])))
     return {'teams': teams}
 
 def teamVteamAPI(T1, T2):
+    load_ipl_data()
     valid_teams = sorted(set(matches['Team1']).union(set(matches['Team2'])))
     if (T1 in valid_teams) and (T2 in valid_teams):
         temp_df = matches[((matches['Team1'] == T1) & (matches['Team2'] == T2)) |
@@ -282,7 +322,10 @@ def batsmanVsTeam(batsman, team, df):
     df = df[df.BowlingTeam == team].copy()
     return batsmanrecord(batsman, df)
 
-def batsmanAPI(name, balls=batter_data):
+def batsmanAPI(name, balls=None):
+    load_ipl_data()
+    if balls is None:
+        balls = batter_data
     df = balls[balls.innings.isin([1, 2])]
     self_record = batsmanrecord(name, df=df)
     TEAMS = sorted(set(matches['Team1']).union(set(matches['Team2'])))
@@ -292,23 +335,6 @@ def batsmanAPI(name, balls=batter_data):
     return data
 
 # Bowler Data
-bowler_data = batter_data.copy()
-
-def bowlerRun(x):
-    if x[0] in ['penalty', 'legbyes', 'byes']:
-        return 0
-    else:
-        return x[1]
-
-bowler_data['bowler_run'] = bowler_data[['extra_type', 'total_run']].apply(bowlerRun, axis=1)
-
-def bowlerWicket(x):
-    if x[0] in ['caught', 'caught and bowled', 'bowled', 'stumped', 'lbw', 'hit wicket']:
-        return x[1]
-    else:
-        return 0
-
-bowler_data['isBowlerWicket'] = bowler_data[['kind', 'isWicketDelivery']].apply(bowlerWicket, axis=1)
 
 def bowlerRecord(bowler, df):
     df = df[df['bowler'] == bowler]
@@ -342,7 +368,10 @@ def bowlerVsTeam(bowler, team, df):
     df = df[df.BattingTeam == team].copy()
     return bowlerRecord(bowler, df)
 
-def bowlerAPI(bowler, balls=bowler_data):
+def bowlerAPI(bowler, balls=None):
+    load_ipl_data()
+    if balls is None:
+        balls = bowler_data
     df = balls[balls.innings.isin([1, 2])]
     self_record = bowlerRecord(bowler, df=df)
     TEAMS = sorted(set(matches['Team1']).union(set(matches['Team2'])))
@@ -468,6 +497,7 @@ def gdp():
 @app.route('/ipl', methods=['GET', 'POST'])
 @app.route('/ipl/', methods=['GET', 'POST'])
 def ipl():
+    load_ipl_data()  # Lazy load IPL data
     teams = sorted(set(matches['Team1']).union(set(matches['Team2'])))
     if request.method == 'POST':
         option = request.form['option']

@@ -1,0 +1,72 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git files
+.git/
+.gitignore
+
+# Jupyter notebooks
+*.ipynb
+
+# Test and development files
+test/
+tests/
+*.test.py
+*_test.py
+
+# Documentation
+README.md
+STEPS
+LICENSE
+
+# Large model files that can be excluded (keep diabetes and house models)
+# *.pkl - keep for now as models are needed
+
+# Image and icon files (serve from CDN or reduce size)
+img/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Attendance system files (camera-based, won't work serverless)
+ATTENDANCE SYSTEM/
+haarcascade_frontalface_default.xml
+
+# SQL comparison files (not needed for web deployment)
+SQL COMPARISION/db1.sql
+SQL COMPARISION/db2.sql
+SQL COMPARISION/reports/
+SQL COMPARISION/summary/
+
+# Student Management (already included via json)
+Student_Management/
+
+# GeoJSON files (large, consider serving from CDN)
+*.geojson
+
+# FastAPI app (if not needed)
+fastapi_app.py
