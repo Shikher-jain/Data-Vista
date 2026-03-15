@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Laptop Price Predictor</h2>
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    {% if not model_ready %}
+        <div class="alert alert-warning">Laptop model is not ready. Please ensure pipe.pkl and df.pkl are present in laptop-price-predictor-regression-project.</div>
+    {% endif %}
+    {% if model_ready %}
+    <form method="post">
+        <div class="row">
+            <div class="col-md-4">
+                <label>Brand</label>
+                <select name="company" class="form-control" required>
+                    {% for c in companies %}
+                        <option value="{{ c }}">{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label>Type</label>
+                <select name="type" class="form-control" required>
+                    {% for t in types %}
+                        <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label>RAM (GB)</label>
+                <select name="ram" class="form-control" required>
+                    {% for r in [2,4,6,8,12,16,24,32,64] %}
+                        <option value="{{ r }}">{{ r }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <label>Weight</label>
+                <input type="number" step="0.01" name="weight" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+                <label>Touchscreen</label>
+                <select name="touchscreen" class="form-control" required>
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label>IPS</label>
+                <select name="ips" class="form-control" required>
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <label>Screen Size (inches)</label>
+                <input type="number" step="0.1" min="10" max="18" name="screen_size" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+                <label>Screen Resolution</label>
+                <select name="resolution" class="form-control" required>
+                    {% for res in ['1920x1080','1366x768','1600x900','3840x2160','3200x1800','2880x1800','2560x1600','2560x1440','2304x1440'] %}
+                        <option value="{{ res }}">{{ res }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label>CPU</label>
+                <select name="cpu" class="form-control" required>
+                    {% for cpu in cpus %}
+                        <option value="{{ cpu }}">{{ cpu }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <label>HDD (GB)</label>
+                <select name="hdd" class="form-control" required>
+                    {% for h in [0,128,256,512,1024,2048] %}
+                        <option value="{{ h }}">{{ h }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label>SSD (GB)</label>
+                <select name="ssd" class="form-control" required>
+                    {% for s in [0,8,128,256,512,1024] %}
+                        <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label>GPU</label>
+                <select name="gpu" class="form-control" required>
+                    {% for g in gpus %}
+                        <option value="{{ g }}">{{ g }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <label>OS</label>
+                <select name="os" class="form-control" required>
+                    {% for o in oses %}
+                        <option value="{{ o }}">{{ o }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-success mt-4">Predict Price</button>
+    </form>
+    {% endif %}
+    {% if prediction %}
+        <div class="alert alert-info mt-4">{{ prediction }}</div>
+    {% endif %}
+</div>
+{% endblock %}

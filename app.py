@@ -213,6 +213,70 @@ def load_ipl_data():
     
     return matches, balls, all_players, batter_data, bowler_data
 
+# Laptop Price Predictor route
+@app.route('/laptop', methods=['GET', 'POST'])
+def laptop():
+    context = {
+        'prediction': None,
+        'error': None,
+        'companies': [],
+        'types': [],
+        'cpus': [],
+        'gpus': [],
+        'oses': [],
+        'model_ready': False,
+    }
+
+    model_path = os.path.join('laptop-price-predictor-regression-project', 'pipe.pkl')
+    df_path = os.path.join('laptop-price-predictor-regression-project', 'df.pkl')
+
+    try:
+        with open(model_path, 'rb') as model_file:
+            pipe = pickle.load(model_file)
+        with open(df_path, 'rb') as df_file:
+            df = pickle.load(df_file)
+    except Exception as e:
+        context['error'] = f"Model or data file missing: {e}"
+        return render_template('laptop.html', **context)
+
+    context.update({
+        'companies': sorted(df['Company'].dropna().unique().tolist()),
+        'types': sorted(df['TypeName'].dropna().unique().tolist()),
+        'cpus': sorted(df['Cpu brand'].dropna().unique().tolist()),
+        'gpus': sorted(df['Gpu brand'].dropna().unique().tolist()),
+        'oses': sorted(df['os'].dropna().unique().tolist()),
+        'model_ready': True,
+    })
+
+    if request.method == 'POST':
+        try:
+            company = request.form['company']
+            type_name = request.form['type']
+            ram = int(request.form['ram'])
+            weight = float(request.form['weight'])
+            touchscreen = 1 if request.form['touchscreen'] == 'Yes' else 0
+            ips = 1 if request.form['ips'] == 'Yes' else 0
+            screen_size = float(request.form['screen_size'])
+            resolution = request.form['resolution']
+            cpu = request.form['cpu']
+            hdd = int(request.form['hdd'])
+            ssd = int(request.form['ssd'])
+            gpu = request.form['gpu']
+            osys = request.form['os']
+
+            x_res = int(resolution.split('x')[0])
+            y_res = int(resolution.split('x')[1])
+            ppi = ((x_res ** 2) + (y_res ** 2)) ** 0.5 / screen_size
+            query = np.array([company, type_name, ram, weight, touchscreen, ips, ppi, cpu, hdd, ssd, gpu, osys])
+            query = query.reshape(1, 12)
+            pred = int(np.exp(pipe.predict(query)[0]))
+            context['prediction'] = f"The predicted price of this configuration is INR {pred}"
+        except Exception as e:
+            context['error'] = f"Prediction error: {e}"
+
+    return render_template('laptop.html', **context)
+
+
 # Helper Functions for IPL
 def convert(obj):
     if isinstance(obj, (np.int64, np.int32)):
