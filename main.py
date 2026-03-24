@@ -417,7 +417,7 @@ def generate_learning_plan(role_title, missing_skills):
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html", context={"request": request})
 
 
 @app.get("/favicon.ico")
@@ -433,7 +433,7 @@ async def diabetes(request: Request):
     if request.method == "POST":
         model, sc = load_diabetes_artifacts()
         if model is None or sc is None:
-            return templates.TemplateResponse("diabetes.html", {"request": request, "prediction_text": "Model artifacts are missing on the server."})
+            return templates.TemplateResponse(request=request, name="diabetes.html", context={"request": request, "prediction_text": "Model artifacts are missing on the server."})
 
         form = await request.form()
         float_features = [float(x) for x in form.values()]
@@ -441,9 +441,9 @@ async def diabetes(request: Request):
         prediction = model.predict(sc.transform(final_features))
 
         pred = "You have Diabetes, please consult a Doctor." if prediction == 1 else "You don't have Diabetes."
-        return templates.TemplateResponse("diabetes.html", {"request": request, "prediction_text": pred})
+        return templates.TemplateResponse(request=request, name="diabetes.html", context={"request": request, "prediction_text": pred})
 
-    return templates.TemplateResponse("diabetes.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="diabetes.html", context={"request": request})
 
 
 @app.api_route("/gdp", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -497,8 +497,9 @@ async def gdp(request: Request):
             metrics.append({"country": country_labels.get(country, country), "value": "N/A", "delta": "n/a", "delta_color": "off"})
 
     return templates.TemplateResponse(
-        "gdp.html",
-        {
+        request=request,
+        name="gdp.html",
+        context={
             "request": request,
             "chart_html": chart_html,
             "metrics": metrics,
@@ -547,9 +548,9 @@ async def ipl(request: Request):
             data = bowler_api(bowler)
             result = {"type": "bowler", "data": data, "bowler": bowler}
 
-        return templates.TemplateResponse("ipl.html", {"request": request, "result": result, "all_players": all_players, "teams": teams})
+        return templates.TemplateResponse(request=request, name="ipl.html", context={"request": request, "result": result, "all_players": all_players, "teams": teams})
 
-    return templates.TemplateResponse("ipl.html", {"request": request, "all_players": all_players, "teams": teams})
+    return templates.TemplateResponse(request=request, name="ipl.html", context={"request": request, "all_players": all_players, "teams": teams})
 
 
 @app.api_route("/weather", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -559,7 +560,7 @@ async def weather(request: Request):
         city = form.get("city", "")
         weather_key = os.getenv("WEATHER_API_KEY")
         if not weather_key:
-            return templates.TemplateResponse("weather.html", {"request": request, "error": "API key not found."})
+            return templates.TemplateResponse(request=request, name="weather.html", context={"request": request, "error": "API key not found."})
 
         url = "https://api.openweathermap.org/data/2.5/weather"
         params = {"APPID": weather_key, "q": city, "units": "metric"}
@@ -577,18 +578,18 @@ async def weather(request: Request):
                 "temp": temp,
                 "icon": f"/static/weather_icons/{icon}.png",
             }
-            return templates.TemplateResponse("weather.html", {"request": request, "weather": weather_info})
+            return templates.TemplateResponse(request=request, name="weather.html", context={"request": request, "weather": weather_info})
         except requests.exceptions.RequestException as exc:
-            return templates.TemplateResponse("weather.html", {"request": request, "error": f"Error fetching weather: {exc}"})
+            return templates.TemplateResponse(request=request, name="weather.html", context={"request": request, "error": f"Error fetching weather: {exc}"})
 
-    return templates.TemplateResponse("weather.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="weather.html", context={"request": request})
 
 
 @app.api_route("/skill", methods=["GET", "POST"], response_class=HTMLResponse)
 async def skill(request: Request):
     if request.method == "POST":
         if not ensure_role_data_loaded():
-            return templates.TemplateResponse("skill.html", {"request": request, "error": role_model_error or "Skill advisory model is unavailable right now."})
+            return templates.TemplateResponse(request=request, name="skill.html", context={"request": request, "error": role_model_error or "Skill advisory model is unavailable right now."})
 
         form = await request.form()
         input_type = form.get("input_type")
@@ -602,7 +603,7 @@ async def skill(request: Request):
             user_skills = []
 
         if not user_skills:
-            return templates.TemplateResponse("skill.html", {"request": request, "error": "Please provide resume text or skills."})
+            return templates.TemplateResponse(request=request, name="skill.html", context={"request": request, "error": "Please provide resume text or skills."})
 
         skill_sentence = ", ".join(user_skills)
         user_emb = role_model.encode([skill_sentence], convert_to_numpy=True)
@@ -625,9 +626,9 @@ async def skill(request: Request):
                 }
             )
 
-        return templates.TemplateResponse("skill.html", {"request": request, "recommendations": recommendations, "user_skills": user_skills})
+        return templates.TemplateResponse(request=request, name="skill.html", context={"request": request, "recommendations": recommendations, "user_skills": user_skills})
 
-    return templates.TemplateResponse("skill.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="skill.html", context={"request": request})
 
 
 @app.api_route("/census", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -660,8 +661,9 @@ async def census(request: Request):
         map_html = folium_map._repr_html_()
 
     return templates.TemplateResponse(
-        "census.html",
-        {
+        request=request,
+        name="census.html",
+        context={
             "request": request,
             "df": filtered_df.to_html(index=False),
             "states": states,
@@ -677,7 +679,7 @@ def attendance(request: Request):
         "Use the StudentAttendance module (register, train, then mark_attendance) from the StudentAttendance folder. "
         "This page provides the Streamlit link and local-camera preview only."
     )
-    return templates.TemplateResponse("attendance.html", {"request": request, "message": msg})
+    return templates.TemplateResponse(request=request, name="attendance.html", context={"request": request, "message": msg})
 
 
 @app.api_route("/students", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -713,8 +715,9 @@ async def student_management(request: Request):
         data, records, error = load_student_records()
 
     return templates.TemplateResponse(
-        "student_management.html",
-        {
+        request=request,
+        name="student_management.html",
+        context={
             "request": request,
             "records": records,
             "error": error,
@@ -759,12 +762,12 @@ async def house(request: Request):
 
         model = load_house_model()
         if model is None:
-            return templates.TemplateResponse("house.html", {"request": request, "prediction": "Model file is missing on the server."})
+            return templates.TemplateResponse(request=request, name="house.html", context={"request": request, "prediction": "Model file is missing on the server."})
 
         prediction = model.predict(input_data)[0]
-        return templates.TemplateResponse("house.html", {"request": request, "prediction": round(prediction, 2)})
+        return templates.TemplateResponse(request=request, name="house.html", context={"request": request, "prediction": round(prediction, 2)})
 
-    return templates.TemplateResponse("house.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="house.html", context={"request": request})
 
 
 @app.api_route("/laptop", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -791,7 +794,7 @@ async def laptop(request: Request):
             df = pickle.load(df_file)
     except Exception as exc:
         context["error"] = f"Model or data file missing: {exc}"
-        return templates.TemplateResponse("laptop.html", context)
+        return templates.TemplateResponse(request=request, name="laptop.html", context=context)
 
     context.update(
         {
@@ -830,7 +833,7 @@ async def laptop(request: Request):
         except Exception as exc:
             context["error"] = f"Prediction error: {exc}"
 
-    return templates.TemplateResponse("laptop.html", context)
+    return templates.TemplateResponse(request=request, name="laptop.html", context=context)
 
 
 @app.api_route("/sql", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -852,8 +855,9 @@ async def sql(
         if has_file_input:
             if not (db1_file and db1_file.filename and db2_file and db2_file.filename):
                 return templates.TemplateResponse(
-                    "sql.html",
-                    {
+                    request=request,
+                    name="sql.html",
+                    context={
                         "request": request,
                         "error": "Please upload both files: db1.sql and db2.sql.",
                     },
@@ -861,8 +865,9 @@ async def sql(
 
             if not db1_file.filename.lower().endswith(".sql") or not db2_file.filename.lower().endswith(".sql"):
                 return templates.TemplateResponse(
-                    "sql.html",
-                    {
+                    request=request,
+                    name="sql.html",
+                    context={
                         "request": request,
                         "error": "Only .sql files are allowed for upload.",
                     },
@@ -872,8 +877,9 @@ async def sql(
             db2_bytes = await db2_file.read()
             if not db1_bytes.strip() or not db2_bytes.strip():
                 return templates.TemplateResponse(
-                    "sql.html",
-                    {
+                    request=request,
+                    name="sql.html",
+                    context={
                         "request": request,
                         "error": "Uploaded SQL files must not be empty.",
                     },
@@ -895,8 +901,9 @@ async def sql(
         elif has_text_input:
             if not (db1_sql and db1_sql.strip() and db2_sql and db2_sql.strip()):
                 return templates.TemplateResponse(
-                    "sql.html",
-                    {
+                    request=request,
+                    name="sql.html",
+                    context={
                         "request": request,
                         "error": "Please provide SQL content for both DB1 and DB2.",
                     },
@@ -907,8 +914,9 @@ async def sql(
 
         else:
             return templates.TemplateResponse(
-                "sql.html",
-                {
+                request=request,
+                name="sql.html",
+                context={
                     "request": request,
                     "error": "Paste SQL in both text areas or upload both .sql files.",
                 },
@@ -919,8 +927,9 @@ async def sql(
             summary_df = pd.read_csv("SQL COMPARISION/summary/db_comparison_summary.csv")
             report_df = pd.read_csv("SQL COMPARISION/reports/db_comparison_report.csv")
             return templates.TemplateResponse(
-                "sql.html",
-                {
+                request=request,
+                name="sql.html",
+                context={
                     "request": request,
                     "message": "Comparison completed successfully.",
                     "summary": summary_df.to_html(),
@@ -928,11 +937,12 @@ async def sql(
                 },
             )
         except subprocess.CalledProcessError as exc:
-            return templates.TemplateResponse("sql.html", {"request": request, "error": f"Error running comparison: {exc}"})
+            return templates.TemplateResponse(request=request, name="sql.html", context={"request": request, "error": f"Error running comparison: {exc}"})
 
     return templates.TemplateResponse(
-        "sql.html",
-        {
+        request=request,
+        name="sql.html",
+        context={
             "request": request,
             "message": "Paste SQL for DB1 and DB2, or upload db1.sql and db2.sql, then run comparison.",
         },
@@ -945,20 +955,20 @@ async def faq(request: Request):
         form = await request.form()
         url = form.get("url")
         if not url:
-            return templates.TemplateResponse("faq.html", {"request": request, "error": "Please provide a URL."})
+            return templates.TemplateResponse(request=request, name="faq.html", context={"request": request, "error": "Please provide a URL."})
 
         try:
             extractor, err = load_faq_extractor()
             if err:
-                return templates.TemplateResponse("faq.html", {"request": request, "error": err})
+                return templates.TemplateResponse(request=request, name="faq.html", context={"request": request, "error": err})
 
             html = extractor.fetch_url(url)
             faqs = extractor.extract_faqs_from_html(html)
-            return templates.TemplateResponse("faq.html", {"request": request, "faqs": faqs[:10]})
+            return templates.TemplateResponse(request=request, name="faq.html", context={"request": request, "faqs": faqs[:10]})
         except Exception as exc:
-            return templates.TemplateResponse("faq.html", {"request": request, "error": f"Error extracting FAQs: {exc}"})
+            return templates.TemplateResponse(request=request, name="faq.html", context={"request": request, "error": f"Error extracting FAQs: {exc}"})
 
-    return templates.TemplateResponse("faq.html", {"request": request, "message": "Enter a URL to extract FAQs from websites."})
+    return templates.TemplateResponse(request=request, name="faq.html", context={"request": request, "message": "Enter a URL to extract FAQs from websites."})
 
 
 @app.get("/api/teams")
