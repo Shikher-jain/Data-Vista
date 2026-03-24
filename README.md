@@ -1,185 +1,158 @@
-# Data Vista 📊
+# Data Vista
 
-A comprehensive data science and machine learning web application that integrates 10+ AI/ML projects into a unified platform. Built with Flask, this application showcases various data analysis, prediction, and visualization capabilities across multiple domains.
+Data Vista is a unified collection of data science, machine learning, analytics, and visualization projects in one repository. It combines Flask pages, Streamlit apps, notebooks, and utility scripts into a single portfolio-style platform.
 
-## 🌟 Features
+## Highlights
 
-Data Vista is a collection of integrated projects, each serving a unique purpose:
+- 10+ integrated projects across ML, NLP, CV, analytics, and dashboards
+- One landing application with project-specific pages and templates
+- Includes both model training notebooks and runnable app interfaces
+- Good reference repository for end-to-end applied data projects
 
-### 1. **Diabetes Prediction** 🏥
-Predict the likelihood of diabetes based on medical parameters like glucose level, insulin, age, and BMI using machine learning models.
+## Included Projects
 
-### 2. **GDP Dashboard** 📈
-Interactive dashboard to visualize and analyze GDP data of countries from 1960 to 2022 with dynamic charts powered by Plotly.
+1. **Diabetes Prediction**
+Predicts diabetes risk from health indicators such as glucose, insulin, BMI, and age.
 
-### 3. **IPL App** 🏏
-Comprehensive IPL (Indian Premier League) statistics and analysis including:
-- Team vs Team performance
-- Player statistics and comparisons
-- Match insights and historical data
+2. **GDP Dashboard**
+Interactive GDP trend analysis using historical country-level data and visual charts.
 
-### 4. **Skill Advisory** 💼
-Get personalized career and skill recommendations based on your resume text using NLP embeddings and nearest neighbor matching.
+3. **IPL Analytics App**
+IPL team, player, and match analysis using ball-by-ball and match datasets.
 
-### 5. **India Census** 🇮🇳
-Analyze and visualize Indian census data with interactive insights and demographic information.
+4. **Skill Advisory**
+Resume-to-role recommendation system based on NLP embeddings and similarity search.
 
-### 6. **Weather App** ☁️
-Real-time weather information for cities worldwide with detailed forecasts and weather icons.
+5. **India Census Explorer**
+State/district level demographic exploration with map and census-based insights.
 
-### 7. **Attendance System** 👤
-Face recognition-based attendance marking system using OpenCV and face recognition technology.
+6. **Weather App**
+City weather lookup with condition icons and external API integration.
 
-### 8. **Advanced House Price Prediction** 🏠
-Predict house prices using advanced machine learning models with feature engineering and selection.
+7. **Student Attendance (Face Recognition)**
+OpenCV-based registration, training, and attendance marking pipeline.
 
-### 9. **SQL Comparison Tool** 🔍
-Compare and analyze SQL database structures and schemas with detailed difference reports.
+8. **Advanced House Price Prediction**
+Feature engineering and model workflows for house price estimation.
 
-### 10. **FAQ Extractor** ❓
-Extract frequently asked questions from text or documents using sentence transformers and NLP.
+9. **SQL Comparison Tool**
+Compares SQL schemas/content and generates CSV reports and summaries.
 
-## 🛠️ Technology Stack
+10. **FAQ Extractor**
+Extracts and serves FAQ-style Q&A from text sources with NLP pipelines.
 
-- **Backend Framework**: Flask
-- **Data Analysis**: Pandas, NumPy
-- **Machine Learning**: Scikit-learn, Sentence Transformers
-- **Visualization**: Plotly, Streamlit
-- **Computer Vision**: OpenCV, face-recognition
-- **Web Scraping**: BeautifulSoup, lxml
-- **Others**: Requests, python-dotenv, SQLparse
+## Technology Stack
 
-## 📋 Prerequisites
+- Backend: Flask, FastAPI (experimental file present), Streamlit
+- Data and ML: Pandas, NumPy, scikit-learn, sentence-transformers
+- Visualization: Plotly
+- Computer Vision: OpenCV, face-recognition
+- Parsing/Scraping/Utilities: BeautifulSoup, lxml, requests, sqlparse, python-dotenv
 
-- Python 3.8 or higher
-- pip (Python package manager)
+## Prerequisites
 
-## 🚀 Installation
+- Python 3.8+
+- pip
 
-1. **Clone the repository**
+## Setup
+
+1. Clone repository
+
 ```bash
 git clone https://github.com/Shikher-jain/Data-Vista.git
 cd Data-Vista
 ```
 
-2. **Create a virtual environment** (recommended)
+2. Create and activate virtual environment
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
 ```
 
-3. **Install dependencies**
+Windows (PowerShell):
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+3. Install dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-4. **Set up environment variables**
-   
-   For the Weather App, create a `.env` file in the `WEATHER APP` directory:
-```bash
+4. Configure environment variables (Weather App)
+
+Create a `.env` file inside `WEATHER APP`:
+
+```env
 WEATHER_API_KEY=your_api_key_here
 ```
 
-## 💻 Usage
+## Run
 
-1. **Run the Flask application**
+Start the main Flask app:
+
 ```bash
 python app.py
 ```
 
-2. **Access the application**
+Then open:
 
-Open your web browser and navigate to:
-```
+```text
 http://127.0.0.1:5000/
 ```
 
-3. **Navigate through projects**
+## Repository Layout
 
-Use the navigation bar to explore different projects or click on project cards on the homepage.
-
-## 📁 Project Structure
-
-```
+```text
 Data-Vista/
-├── app.py                      # Main Flask application
-├── requirements.txt            # Python dependencies
-├── static/                     # Static assets (CSS, JS, images)
-│   ├── style.css
-│   ├── script.js
-│   └── weather_icons/
-├── templates/                  # HTML templates
-│   ├── base.html
-│   ├── index.html
-│   └── [project-specific templates]
-├── ADV HOUSE PREDICTION/       # House price prediction models
-├── ATTENDANCE SYSTEM/          # Face recognition attendance
-├── DIABETES PREDICTION/        # Diabetes prediction ML model
-├── FAQ EXTRACTOR/              # FAQ extraction tool
-├── GDP DASHBOARD/              # GDP data visualization
-├── INDIA CENSUS/               # Census data analysis
-├── IPL APP/                    # IPL statistics and analysis
-├── SKILL ADVISORY/             # Career recommendation system
-├── SQL COMPARISON/             # SQL comparison utility
-└── WEATHER APP/                # Weather information service
+|-- app.py
+|-- main.py
+|-- fastapi_app.py
+|-- requirements.txt
+|-- templates/
+|-- static/
+|-- ADV HOUSE PREDICTION/
+|-- DIABETES PREDICTION/
+|-- FAQ EXTRACTOR/
+|-- GDP DASHBOARD/
+|-- INDIA CENSUS/
+|-- IPL APP/
+|-- SKILL ADVISORY/
+|-- SQL COMPARISION/
+|-- StudentAttendance/
+|-- Student_Management/
+|-- WEATHER APP/
+`-- laptop-price-predictor-regression-project/
 ```
 
-## 🎯 Individual Project Details
+## Notes
 
-Each subdirectory contains its own README with specific details:
+- Some projects are standalone and can be run from their own folders.
+- Model/data files are included in subdirectories where required.
+- For project-specific commands, check each subfolder README.
 
-- **ADV HOUSE PREDICTION**: Advanced house price prediction using machine learning
-- **ATTENDANCE SYSTEM**: Real-time face recognition for attendance tracking
-- **DIABETES PREDICTION**: Medical diagnosis prediction system
-- **FAQ EXTRACTOR**: Automated FAQ generation from text
-- **GDP DASHBOARD**: Economic data visualization tool
-- **INDIA CENSUS**: Demographic analysis platform
-- **IPL APP**: Cricket statistics and analytics
-- **SKILL ADVISORY**: AI-powered career guidance
-- **SQL COMPARISON**: Database schema comparison tool
-- **WEATHER APP**: Weather forecast application
-
-## 🎨 Features Highlights
-
-- **Responsive Design**: Modern, mobile-friendly UI with dark/light theme toggle
-- **Interactive Visualizations**: Dynamic charts and graphs using Plotly
-- **Machine Learning Models**: Pre-trained models for various prediction tasks
-- **Real-time Data**: Live weather updates and data processing
-- **Unified Platform**: All projects accessible from a single interface
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+2. Create a branch: `git checkout -b feature/your-change`
+3. Commit: `git commit -m "Describe your change"`
+4. Push: `git push origin feature/your-change`
+5. Open a pull request
 
-## 📝 License
+## Author
 
-This project is licensed under the MIT License - see individual project directories for specific license information.
+Shikher Jain  
+GitHub: https://github.com/Shikher-jain
 
-## 👨‍💻 Author
+## Support
 
-**Shikher Jain**
-
-- GitHub: [@Shikher-jain](https://github.com/Shikher-jain)
-
-## 🙏 Acknowledgments
-
-- IPL official statistics for cricket data
-- Streamlit for interactive dashboards
-- Flask community for the excellent web framework
-- All open-source libraries and their maintainers
-
-## 📞 Support
-
-For issues, questions, or suggestions:
-- Open an issue on GitHub
-- Submit a pull request with improvements
-
----
-
-⭐ If you find this project useful, please consider giving it a star!
+- Open a GitHub issue for bugs or feature requests
+- Submit a pull request for improvements

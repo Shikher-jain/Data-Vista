@@ -35,9 +35,9 @@
                     {% for country in countries %}
                         <div class="col-md-2">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="countries" value="{{ country }}" id="country_{{ country }}" {% if country in selected_countries %}checked{% endif %}>
-                                <label class="form-check-label" for="country_{{ country }}">
-                                    {{ country }}
+                                <input class="form-check-input" type="checkbox" name="countries" value="{{ country.code }}" id="country_{{ country.code }}" {% if country.code in selected_countries %}checked{% endif %}>
+                                <label class="form-check-label" for="country_{{ country.code }}">
+                                    {{ country.name }}
                                 </label>
                             </div>
                         </div>
