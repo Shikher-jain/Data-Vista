@@ -1,81 +1,64 @@
 # Data Vista
 
-Data Vista is a unified collection of data science, machine learning, analytics, and visualization projects in one repository. It combines Flask pages, Streamlit apps, notebooks, and utility scripts into a single portfolio-style platform.
+Data Vista is a multi-project data science platform that brings machine learning, analytics, visualization, NLP, and utility workflows into one application.
 
-## Highlights
+The current primary backend entrypoint is FastAPI via main.py.
 
-- 10+ integrated projects across ML, NLP, CV, analytics, and dashboards
-- One landing application with project-specific pages and templates
-- Includes both model training notebooks and runnable app interfaces
-- Good reference repository for end-to-end applied data projects
+## Branch Info
 
-## Included Projects
+- Branch: fastapi (FastAPI branch)
+- Primary app entrypoint: main.py
+- Recommended run command: uvicorn main:app --reload
 
-1. **Diabetes Prediction**
-Predicts diabetes risk from health indicators such as glucose, insulin, BMI, and age.
+## What is Included
 
-2. **GDP Dashboard**
-Interactive GDP trend analysis using historical country-level data and visual charts.
+- Diabetes prediction
+- GDP dashboard and country trend analysis
+- IPL team and player analytics
+- Skill advisory based on resume and skills
+- India census exploration
+- Weather lookup with icon support
+- Student attendance and student management workflows
+- Advanced house price prediction
+- SQL schema comparison with summary and report output
+- FAQ extraction from website content
+- Laptop price prediction module
 
-3. **IPL Analytics App**
-IPL team, player, and match analysis using ball-by-ball and match datasets.
+## Tech Stack
 
-4. **Skill Advisory**
-Resume-to-role recommendation system based on NLP embeddings and similarity search.
-
-5. **India Census Explorer**
-State/district level demographic exploration with map and census-based insights.
-
-6. **Weather App**
-City weather lookup with condition icons and external API integration.
-
-7. **Student Attendance (Face Recognition)**
-OpenCV-based registration, training, and attendance marking pipeline.
-
-8. **Advanced House Price Prediction**
-Feature engineering and model workflows for house price estimation.
-
-9. **SQL Comparison Tool**
-Compares SQL schemas/content and generates CSV reports and summaries.
-
-10. **FAQ Extractor**
-Extracts and serves FAQ-style Q&A from text sources with NLP pipelines.
-
-## Technology Stack
-
-- Backend: Flask, FastAPI (experimental file present), Streamlit
-- Data and ML: Pandas, NumPy, scikit-learn, sentence-transformers
+- Backend: FastAPI, Streamlit
+- Data and ML: pandas, numpy, scikit-learn, sentence-transformers
 - Visualization: Plotly
-- Computer Vision: OpenCV, face-recognition
-- Parsing/Scraping/Utilities: BeautifulSoup, lxml, requests, sqlparse, python-dotenv
+- CV: OpenCV, face-recognition
+- Parsing and utilities: requests, sqlparse, BeautifulSoup, lxml, python-dotenv
 
-## Prerequisites
+## Requirements
 
 - Python 3.8+
 - pip
 
 ## Setup
 
-1. Clone repository
+1. Clone the repository
 
 ```bash
 git clone https://github.com/Shikher-jain/Data-Vista.git
 cd Data-Vista
 ```
 
-2. Create and activate virtual environment
+2. Create and activate a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-Windows (PowerShell):
+Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Linux/macOS:
+Linux or macOS:
 
 ```bash
 source .venv/bin/activate
@@ -87,35 +70,37 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Configure environment variables (Weather App)
+4. Configure environment variables
 
-Create a `.env` file inside `WEATHER APP`:
+Create a .env file in the project root (or ensure WEATHER_API_KEY is available in environment):
 
 ```env
 WEATHER_API_KEY=your_api_key_here
 ```
 
-## Run
-
-Start the main Flask app:
+## Run (FastAPI)
 
 ```bash
-python app.py
+uvicorn main:app --reload
 ```
 
-Then open:
+Open:
 
 ```text
-http://127.0.0.1:5000/
+http://127.0.0.1:8000/
 ```
 
-## Repository Layout
+API docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+## Key Paths
 
 ```text
 Data-Vista/
-|-- app.py
 |-- main.py
-|-- fastapi_app.py
 |-- requirements.txt
 |-- templates/
 |-- static/
@@ -135,24 +120,26 @@ Data-Vista/
 
 ## Notes
 
-- Some projects are standalone and can be run from their own folders.
-- Model/data files are included in subdirectories where required.
-- For project-specific commands, check each subfolder README.
+- Some subprojects are standalone and can be run independently.
+- SQL comparison supports either pasted SQL or uploaded .sql files for db1 and db2.
+- GDP dashboard displays full country names while preserving code-based filtering.
 
 ## Contributing
 
 1. Fork the repository
-2. Create a branch: `git checkout -b feature/your-change`
-3. Commit: `git commit -m "Describe your change"`
-4. Push: `git push origin feature/your-change`
+2. Create a branch
+3. Commit your changes
+4. Push the branch
 5. Open a pull request
 
 ## Author
 
-Shikher Jain  
-GitHub: https://github.com/Shikher-jain
+Shikher Jain
+
+GitHub:
+https://github.com/Shikher-jain
 
 ## Support
 
-- Open a GitHub issue for bugs or feature requests
-- Submit a pull request for improvements
+- Open an issue for bugs or feature requests
+- Submit pull requests for improvements
