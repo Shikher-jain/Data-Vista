@@ -5,20 +5,63 @@
 {% block content %}
     <div class="container mt-4">
         <h1>SQL Comparison</h1>
-        {% if message %}
-        <p>{{ message }}</p>
-        <form method="POST">
-            <button type="submit" class="btn btn-primary">Compare</button>
+        <p class="text-muted">Paste SQL for DB1 and DB2, or upload db1.sql and db2.sql (only .sql files), then run comparison.</p>
+
+        <form method="POST" enctype="multipart/form-data" class="mb-3">
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label for="db1_sql" class="form-label">DB1 SQL (Paste)</label>
+                    <textarea class="form-control" id="db1_sql" name="db1_sql" rows="8" placeholder="Paste CREATE TABLE statements for DB1 here"></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label for="db2_sql" class="form-label">DB2 SQL (Paste)</label>
+                    <textarea class="form-control" id="db2_sql" name="db2_sql" rows="8" placeholder="Paste CREATE TABLE statements for DB2 here"></textarea>
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label for="db1_file" class="form-label">DB1 SQL File (Upload .sql)</label>
+                    <input class="form-control" type="file" id="db1_file" name="db1_file" accept=".sql">
+                </div>
+                <div class="col-md-6">
+                    <label for="db2_file" class="form-label">DB2 SQL File (Upload .sql)</label>
+                    <input class="form-control" type="file" id="db2_file" name="db2_file" accept=".sql">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Run Comparison</button>
+            <a href="/" class="btn btn-outline-secondary">Back to Home</a>
         </form>
+
+        {% if message %}
+        <div class="alert alert-info">{{ message }}</div>
         {% endif %}
+
         {% if error %}
         <div class="alert alert-danger">{{ error }}</div>
         {% endif %}
+
         {% if summary %}
-        <h3>Summary</h3>
-        {{ summary|safe }}
-        <h3>Report</h3>
-        {{ report|safe }}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Summary</h3>
+            </div>
+            <div class="card-body table-responsive">
+                {{ summary|safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if report %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="mb-0">Detailed Report</h3>
+            </div>
+            <div class="card-body table-responsive">
+                {{ report|safe }}
+            </div>
+        </div>
         {% endif %}
     </div>
 {% endblock %}
