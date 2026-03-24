@@ -4,9 +4,8 @@ Data Vista is a multi-project data science platform that brings machine learning
 
 The current primary backend entrypoint is FastAPI via main.py.
 
-## Branch Info
+## App Info
 
-- Branch: fastapi (FastAPI branch)
 - Primary app entrypoint: main.py
 - Recommended run command: uvicorn main:app --reload
 
@@ -26,7 +25,7 @@ The current primary backend entrypoint is FastAPI via main.py.
 
 ## Tech Stack
 
-- Backend: FastAPI, Streamlit
+- Backend: FastAPI, Streamlit (primary entrypoint is FastAPI via main.py; some subprojects also use Flask independently)
 - Data and ML: pandas, numpy, scikit-learn, sentence-transformers
 - Visualization: Plotly
 - CV: OpenCV, face-recognition
@@ -80,8 +79,16 @@ WEATHER_API_KEY=your_api_key_here
 
 ## Run (FastAPI)
 
+Development:
+
 ```bash
 uvicorn main:app --reload
+```
+
+Production (matches the included `Procfile`):
+
+```bash
+gunicorn main:app -k uvicorn.workers.UvicornWorker
 ```
 
 Open:
