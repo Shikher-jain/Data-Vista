@@ -9,6 +9,9 @@
 <body>
     <div class="container mt-4">
         <h1>🏏 IPL Stats Dashboard</h1>
+        {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
 
         <form method="POST">
             <div class="mb-3">

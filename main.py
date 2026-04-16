@@ -1,17 +1,19 @@
 import os
+import json
 from pathlib import Path
 import importlib.util
-import json
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 import ast
 import re
 import subprocess
 import warnings
 import sys
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, File, UploadFile
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -49,11 +51,37 @@ role_model_error: Optional[str] = None
 
 diabetes_model = None
 diabetes_scaler = None
+advanced_diabetes_model = None
+advanced_diabetes_scaler = None
+advanced_diabetes_metadata: Optional[Dict[str, Any]] = None
+advanced_diabetes_error: Optional[str] = None
 house_model = None
 faq_extractor_module = None
 
-STUDENT_MGMT_DIR = Path(__file__).resolve().parent / "Student_Management"
+BASE_DIR = Path(__file__).resolve().parent
+
+
+def load_data_store_class():
+    module_path = BASE_DIR / "data_store.py"
+    spec = importlib.util.spec_from_file_location("data_store_module", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load data_store module at {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+    return module.DataVistaStore
+
+
+DataVistaStore = load_data_store_class()
+
+STUDENT_MGMT_DIR = BASE_DIR / "Student_Management"
 STUDENT_MGMT_DATA = STUDENT_MGMT_DIR / "students.json"
+DATA_STORE = DataVistaStore(
+    db_path=BASE_DIR / "data_vista.db",
+    students_json_path=STUDENT_MGMT_DATA,
+    gdp_csv_path=BASE_DIR / "GDP DASHBOARD" / "data" / "gdp_data.csv",
+)
+DATA_STORE_ERROR: Optional[str] = None
 
 matches = None
 balls = None
@@ -114,6 +142,44 @@ def load_diabetes_artifacts():
     return diabetes_model, diabetes_scaler
 
 
+def load_advanced_diabetes_artifacts() -> Tuple[Any, Any, Optional[Dict[str, Any]], Optional[str]]:
+    global advanced_diabetes_model, advanced_diabetes_scaler, advanced_diabetes_metadata, advanced_diabetes_error
+
+    if (
+        advanced_diabetes_model is not None
+        and advanced_diabetes_scaler is not None
+        and advanced_diabetes_metadata is not None
+    ):
+        return advanced_diabetes_model, advanced_diabetes_scaler, advanced_diabetes_metadata, None
+
+    if advanced_diabetes_error is not None:
+        return None, None, None, advanced_diabetes_error
+
+    artifacts_dir = Path("DIABETES PREDICTION") / "outputs" / "advanced_pipeline" / "artifacts"
+    metadata_path = Path("DIABETES PREDICTION") / "outputs" / "advanced_pipeline" / "run_metadata.json"
+
+    try:
+        advanced_diabetes_model = joblib.load(artifacts_dir / "tuned_random_forest.joblib")
+        advanced_diabetes_scaler = joblib.load(artifacts_dir / "engineered_feature_scaler.joblib")
+        advanced_diabetes_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        return advanced_diabetes_model, advanced_diabetes_scaler, advanced_diabetes_metadata, None
+    except FileNotFoundError:
+        advanced_diabetes_model = None
+        advanced_diabetes_scaler = None
+        advanced_diabetes_metadata = None
+        advanced_diabetes_error = (
+            "Advanced model artifacts are missing. "
+            "Run DIABETES PREDICTION/advanced_diabetes_pipeline.py first."
+        )
+        return None, None, None, advanced_diabetes_error
+    except Exception as exc:
+        advanced_diabetes_model = None
+        advanced_diabetes_scaler = None
+        advanced_diabetes_metadata = None
+        advanced_diabetes_error = f"Could not load advanced diabetes artifacts: {exc}"
+        return None, None, None, advanced_diabetes_error
+
+
 def load_house_model():
     global house_model
     if house_model is None:
@@ -147,35 +213,103 @@ def load_faq_extractor():
 
 
 def load_student_records():
-    if not STUDENT_MGMT_DATA.exists():
-        return {}, [], "students.json not found. Add a student to create it."
     try:
-        with open(STUDENT_MGMT_DATA, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        records = DATA_STORE.list_students()
+        data = {row["name"]: row["grade"] for row in records}
         items = sorted(({"name": k, "grade": v} for k, v in data.items()), key=lambda x: x["name"].lower())
         return data, items, None
     except Exception as exc:
-        return {}, [], f"Could not read students.json: {exc}"
-
-
-def save_student_records(data: dict):
-    STUDENT_MGMT_DATA.parent.mkdir(parents=True, exist_ok=True)
-    with open(STUDENT_MGMT_DATA, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        return {}, [], f"Could not read student records: {exc}"
 
 
 def get_gdp_data():
-    raw_gdp_df = pd.read_csv("GDP DASHBOARD/data/gdp_data.csv")
-    min_year = 1960
-    max_year = 2022
-    gdp_df = raw_gdp_df.melt(
-        ["Country Code", "Country Name"],
-        [str(x) for x in range(min_year, max_year + 1)],
-        "Year",
-        "GDP",
+    try:
+        return DATA_STORE.load_gdp_data()
+    except Exception:
+        # Fallback keeps the dashboard operational if the database is unavailable.
+        raw_gdp_df = pd.read_csv("GDP DASHBOARD/data/gdp_data.csv")
+        min_year = 1960
+        max_year = 2022
+        gdp_df = raw_gdp_df.melt(
+            ["Country Code", "Country Name"],
+            [str(x) for x in range(min_year, max_year + 1)],
+            "Year",
+            "GDP",
+        )
+        gdp_df["Year"] = pd.to_numeric(gdp_df["Year"])
+        return gdp_df
+
+
+def parse_float(form_data, field_name: str, label: str, min_value: Optional[float] = None, max_value: Optional[float] = None) -> float:
+    raw = form_data.get(field_name)
+    if raw is None or str(raw).strip() == "":
+        raise ValueError(f"{label} is required.")
+
+    try:
+        value = float(str(raw).strip())
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a valid number.") from exc
+
+    if min_value is not None and value < min_value:
+        raise ValueError(f"{label} must be at least {min_value}.")
+    if max_value is not None and value > max_value:
+        raise ValueError(f"{label} must be at most {max_value}.")
+    return value
+
+
+def parse_int(form_data, field_name: str, label: str, min_value: Optional[int] = None, max_value: Optional[int] = None) -> int:
+    raw = form_data.get(field_name)
+    if raw is None or str(raw).strip() == "":
+        raise ValueError(f"{label} is required.")
+
+    try:
+        value = int(str(raw).strip())
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a whole number.") from exc
+
+    if min_value is not None and value < min_value:
+        raise ValueError(f"{label} must be at least {min_value}.")
+    if max_value is not None and value > max_value:
+        raise ValueError(f"{label} must be at most {max_value}.")
+    return value
+
+
+def is_valid_http_url(value: str) -> bool:
+    try:
+        parsed = urlparse(value)
+        return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+    except Exception:
+        return False
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(status_code=422, content={"error": "Invalid request payload.", "details": exc.errors()})
+    return templates.TemplateResponse(
+        "error.html",
+        {
+            "request": request,
+            "title": "Invalid Input",
+            "error": "Some fields were missing or invalid. Please review your input and try again.",
+        },
+        status_code=422,
     )
-    gdp_df["Year"] = pd.to_numeric(gdp_df["Year"])
-    return gdp_df
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(status_code=500, content={"error": "Internal server error."})
+    return templates.TemplateResponse(
+        "error.html",
+        {
+            "request": request,
+            "title": "Unexpected Error",
+            "error": "Something went wrong while processing your request. Please try again.",
+        },
+        status_code=500,
+    )
 
 
 def load_ipl_data():
@@ -417,7 +551,7 @@ def generate_learning_plan(role_title, missing_skills):
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request, "storage_warning": DATA_STORE_ERROR})
 
 
 @app.get("/favicon.ico")
@@ -430,20 +564,114 @@ def favicon():
 
 @app.api_route("/diabetes", methods=["GET", "POST"], response_class=HTMLResponse)
 async def diabetes(request: Request):
+    default_context = {
+        "request": request,
+        "selected_model": "basic",
+        "form_data": {},
+        "prediction_text": None,
+    }
+
     if request.method == "POST":
+        form = await request.form()
+        model_type = (form.get("model_type") or "basic").strip().lower()
+        if model_type not in {"basic", "advanced"}:
+            model_type = "basic"
+
+        context = {
+            "request": request,
+            "selected_model": model_type,
+            "form_data": {k: str(v) for k, v in form.items()},
+            "prediction_text": None,
+        }
+
+        if model_type == "advanced":
+            model, sc, metadata, load_error = load_advanced_diabetes_artifacts()
+            if load_error is not None or model is None or sc is None or metadata is None:
+                context["prediction_text"] = load_error or "Advanced model artifacts are missing on the server."
+                return templates.TemplateResponse("diabetes.html", context)
+
+            try:
+                gender = (form.get("gender_adv") or "").strip()
+                smoking_history = (form.get("smoking_history_adv") or "").strip()
+                age = parse_float(form, "age_adv", "Age", min_value=0, max_value=120)
+                hypertension = parse_int(form, "hypertension_adv", "Hypertension", min_value=0, max_value=1)
+                heart_disease = parse_int(form, "heart_disease_adv", "Heart Disease", min_value=0, max_value=1)
+                bmi = parse_float(form, "bmi_adv", "BMI", min_value=0)
+                hba1c_level = parse_float(form, "hba1c_level_adv", "HbA1c Level", min_value=0)
+                blood_glucose_level = parse_float(form, "blood_glucose_level_adv", "Blood Glucose Level", min_value=0)
+
+                encoder_maps = metadata.get("encoder_maps", {}) if isinstance(metadata, dict) else {}
+                gender_map = encoder_maps.get("gender", {}) if isinstance(encoder_maps, dict) else {}
+                smoking_map = encoder_maps.get("smoking_history", {}) if isinstance(encoder_maps, dict) else {}
+
+                if gender not in gender_map:
+                    supported = ", ".join(sorted(gender_map.keys())) or "Female, Male, Other"
+                    raise ValueError(f"Unsupported gender value. Use one of: {supported}")
+                if smoking_history not in smoking_map:
+                    supported = ", ".join(sorted(smoking_map.keys())) or "No Info, current, ever, former, never, not current"
+                    raise ValueError(f"Unsupported smoking history value. Use one of: {supported}")
+
+                row = pd.DataFrame(
+                    [
+                        {
+                            "gender": int(gender_map[gender]),
+                            "hypertension": hypertension,
+                            "heart_disease": heart_disease,
+                            "smoking_history": int(smoking_map[smoking_history]),
+                            "bmi_age": bmi * age,
+                            "glucose_hba1c": blood_glucose_level * hba1c_level,
+                            "hypertension_heart": hypertension + heart_disease,
+                        }
+                    ]
+                )
+
+                row[["bmi_age", "glucose_hba1c"]] = sc.transform(row[["bmi_age", "glucose_hba1c"]])
+                selected_features = metadata.get("selected_features", []) if isinstance(metadata, dict) else []
+                if selected_features:
+                    missing_features = [col for col in selected_features if col not in row.columns]
+                    if missing_features:
+                        raise ValueError(
+                            "Advanced model metadata is inconsistent. Missing features: " + ", ".join(missing_features)
+                        )
+                    row = row[selected_features]
+            except ValueError as exc:
+                context["prediction_text"] = str(exc)
+                return templates.TemplateResponse("diabetes.html", context)
+
+            prediction = model.predict(row)
+            pred = "You have Diabetes, please consult a Doctor." if int(prediction[0]) == 1 else "You don't have Diabetes."
+
+            if hasattr(model, "predict_proba"):
+                try:
+                    risk = float(model.predict_proba(row)[0][1])
+                    pred = f"{pred} (Predicted risk score: {risk * 100:.1f}%)"
+                except Exception:
+                    pass
+
+            context["prediction_text"] = pred
+            return templates.TemplateResponse("diabetes.html", context)
+
         model, sc = load_diabetes_artifacts()
         if model is None or sc is None:
-            return templates.TemplateResponse("diabetes.html", {"request": request, "prediction_text": "Model artifacts are missing on the server."})
+            context["prediction_text"] = "Model artifacts are missing on the server."
+            return templates.TemplateResponse("diabetes.html", context)
 
-        form = await request.form()
-        float_features = [float(x) for x in form.values()]
-        final_features = [np.array(float_features)]
+        try:
+            glucose = parse_float(form, "glucose", "Glucose", min_value=0)
+            bloodpressure = parse_float(form, "bloodpressure", "Blood Pressure", min_value=0)
+            insulin = parse_float(form, "insulin", "Insulin", min_value=0)
+            bmi = parse_float(form, "bmi", "BMI", min_value=0)
+        except ValueError as exc:
+            context["prediction_text"] = str(exc)
+            return templates.TemplateResponse("diabetes.html", context)
+
+        final_features = np.array([[glucose, bloodpressure, insulin, bmi]])
         prediction = model.predict(sc.transform(final_features))
 
-        pred = "You have Diabetes, please consult a Doctor." if prediction == 1 else "You don't have Diabetes."
-        return templates.TemplateResponse("diabetes.html", {"request": request, "prediction_text": pred})
+        context["prediction_text"] = "You have Diabetes, please consult a Doctor." if int(prediction[0]) == 1 else "You don't have Diabetes."
+        return templates.TemplateResponse("diabetes.html", context)
 
-    return templates.TemplateResponse("diabetes.html", {"request": request})
+    return templates.TemplateResponse("diabetes.html", default_context)
 
 
 @app.api_route("/gdp", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -453,13 +681,26 @@ async def gdp(request: Request):
     max_year = int(gdp_df["Year"].max())
     country_df = gdp_df[["Country Code", "Country Name"]].drop_duplicates().sort_values("Country Name")
     country_labels = dict(zip(country_df["Country Code"], country_df["Country Name"]))
+    valid_codes = set(country_df["Country Code"].tolist())
     countries = [{"code": row["Country Code"], "name": row["Country Name"]} for _, row in country_df.iterrows()]
+    error = None
 
     if request.method == "POST":
         form = await request.form()
-        from_year = int(form.get("from_year", min_year))
-        to_year = int(form.get("to_year", max_year))
-        selected_countries = form.getlist("countries")
+        try:
+            from_year = parse_int(form, "from_year", "From Year", min_value=min_year, max_value=max_year)
+            to_year = parse_int(form, "to_year", "To Year", min_value=min_year, max_value=max_year)
+        except ValueError as exc:
+            error = str(exc)
+            from_year = min_year
+            to_year = max_year
+
+        if from_year > to_year:
+            error = "From Year cannot be greater than To Year."
+            from_year = min_year
+            to_year = max_year
+
+        selected_countries = [code for code in form.getlist("countries") if code in valid_codes]
     else:
         from_year = min_year
         to_year = max_year
@@ -473,6 +714,9 @@ async def gdp(request: Request):
         & (gdp_df["Year"] <= to_year)
         & (from_year <= gdp_df["Year"])
     ]
+
+    if filtered_gdp_df.empty:
+        error = "No GDP data is available for the selected filters."
 
     fig = px.line(filtered_gdp_df, x="Year", y="GDP", color="Country Name", title="GDP over time")
     chart_html = pyo.plot(fig, output_type="div", include_plotlyjs=True)
@@ -508,6 +752,7 @@ async def gdp(request: Request):
             "countries": countries,
             "min_year": min_year,
             "max_year": max_year,
+            "error": error,
         },
     )
 
@@ -517,6 +762,7 @@ async def gdp(request: Request):
 async def ipl(request: Request):
     load_ipl_data()
     teams = sorted(set(matches["Team1"]).union(set(matches["Team2"])))
+    error = None
 
     if request.method == "POST":
         form = await request.form()
@@ -529,7 +775,12 @@ async def ipl(request: Request):
         elif option == "Team vs Team":
             t1 = form.get("t1")
             t2 = form.get("t2")
-            result = team_v_team_api(t1, t2)
+            if not t1 or not t2:
+                error = "Please select both teams."
+            elif t1 == t2:
+                error = "Please select two different teams."
+            else:
+                result = team_v_team_api(t1, t2)
             result["type"] = "team_vs_team"
             result["t1"] = t1
             result["t2"] = t2
@@ -546,17 +797,22 @@ async def ipl(request: Request):
             bowler = form.get("bowler")
             data = bowler_api(bowler)
             result = {"type": "bowler", "data": data, "bowler": bowler}
+        else:
+            error = "Please choose a valid analysis option."
 
-        return templates.TemplateResponse("ipl.html", {"request": request, "result": result, "all_players": all_players, "teams": teams})
+        return templates.TemplateResponse("ipl.html", {"request": request, "result": result, "all_players": all_players, "teams": teams, "error": error})
 
-    return templates.TemplateResponse("ipl.html", {"request": request, "all_players": all_players, "teams": teams})
+    return templates.TemplateResponse("ipl.html", {"request": request, "all_players": all_players, "teams": teams, "error": error})
 
 
 @app.api_route("/weather", methods=["GET", "POST"], response_class=HTMLResponse)
 async def weather(request: Request):
     if request.method == "POST":
         form = await request.form()
-        city = form.get("city", "")
+        city = (form.get("city") or "").strip()
+        if not city:
+            return templates.TemplateResponse("weather.html", {"request": request, "error": "Please enter a city name."})
+
         weather_key = os.getenv("WEATHER_API_KEY")
         if not weather_key:
             return templates.TemplateResponse("weather.html", {"request": request, "error": "API key not found."})
@@ -564,9 +820,13 @@ async def weather(request: Request):
         url = "https://api.openweathermap.org/data/2.5/weather"
         params = {"APPID": weather_key, "q": city, "units": "metric"}
         try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
+            response = requests.get(url, params=params, timeout=10)
             weather_data = response.json()
+
+            if response.status_code != 200:
+                message = weather_data.get("message", "Could not fetch weather details.")
+                return templates.TemplateResponse("weather.html", {"request": request, "error": f"Weather service error: {message}"})
+
             city_name = weather_data["name"]
             conditions = weather_data["weather"][0]["description"].capitalize()
             temp = weather_data["main"]["temp"]
@@ -578,7 +838,7 @@ async def weather(request: Request):
                 "icon": f"/static/weather_icons/{icon}.png",
             }
             return templates.TemplateResponse("weather.html", {"request": request, "weather": weather_info})
-        except requests.exceptions.RequestException as exc:
+        except (requests.exceptions.RequestException, KeyError, TypeError) as exc:
             return templates.TemplateResponse("weather.html", {"request": request, "error": f"Error fetching weather: {exc}"})
 
     return templates.TemplateResponse("weather.html", {"request": request})
@@ -603,6 +863,9 @@ async def skill(request: Request):
 
         if not user_skills:
             return templates.TemplateResponse("skill.html", {"request": request, "error": "Please provide resume text or skills."})
+
+        if role_model is None or nn is None or role_embeddings is None or roles_df is None:
+            return templates.TemplateResponse("skill.html", {"request": request, "error": "Skill advisory model is not ready yet."})
 
         skill_sentence = ", ".join(user_skills)
         user_emb = role_model.encode([skill_sentence], convert_to_numpy=True)
@@ -682,35 +945,41 @@ def attendance(request: Request):
 
 @app.api_route("/students", methods=["GET", "POST"], response_class=HTMLResponse)
 async def student_management(request: Request):
-    data, records, error = load_student_records()
+    _, records, error = load_student_records()
     message = None
 
     if request.method == "POST":
         form = await request.form()
-        action = form.get("action")
+        action = (form.get("action") or "").strip().lower()
         name = (form.get("name") or "").strip()
 
         if action == "add":
-            grade_raw = form.get("grade")
-            if not name or grade_raw is None or grade_raw == "":
+            if not name:
                 message = "Name and grade are required."
             else:
                 try:
-                    grade = float(grade_raw)
-                    data[name] = grade
-                    save_student_records(data)
+                    grade = parse_float(form, "grade", "Grade")
+                    DATA_STORE.upsert_student(name, grade)
                     message = f"Saved {name}."
-                except ValueError:
-                    message = "Grade must be a number."
+                except ValueError as exc:
+                    message = str(exc)
+                except Exception as exc:
+                    error = f"Could not save student record: {exc}"
         elif action == "delete":
-            if name in data:
-                data.pop(name, None)
-                save_student_records(data)
-                message = f"Deleted {name}."
+            if not name:
+                message = "Name is required to delete a student."
             else:
-                message = f"{name} not found."
+                try:
+                    deleted = DATA_STORE.delete_student(name)
+                    message = f"Deleted {name}." if deleted else f"{name} not found."
+                except Exception as exc:
+                    error = f"Could not delete student record: {exc}"
+        else:
+            message = "Unsupported action."
 
-        data, records, error = load_student_records()
+        _, records, refresh_error = load_student_records()
+        if refresh_error and not error:
+            error = refresh_error
 
     return templates.TemplateResponse(
         "student_management.html",
@@ -719,7 +988,7 @@ async def student_management(request: Request):
             "records": records,
             "error": error,
             "message": message,
-            "data_file": str(STUDENT_MGMT_DATA),
+            "data_file": str(DATA_STORE.db_path),
             "streamlit_cmd": "streamlit run Student_Management/stud_managementSTREAMLIT.py",
             "tkinter_cmd": "python Student_Management/stud_managementTK.py",
         },
@@ -730,15 +999,18 @@ async def student_management(request: Request):
 async def house(request: Request):
     if request.method == "POST":
         form = await request.form()
-        lot_area = float(form["lot_area"])
-        year_built = int(form["year_built"])
-        first_flr_sf = float(form["first_flr_sf"])
-        second_flr_sf = float(form["second_flr_sf"])
-        full_bath = int(form["full_bath"])
-        bedroom_abv_gr = int(form["bedroom_abv_gr"])
-        tot_rms_abv_grd = int(form["tot_rms_abv_grd"])
-        overall_qual = int(form["overall_qual"])
-        overall_cond = int(form["overall_cond"])
+        try:
+            lot_area = parse_float(form, "lot_area", "Lot Area", min_value=0)
+            year_built = parse_int(form, "year_built", "Year Built", min_value=1800, max_value=2100)
+            first_flr_sf = parse_float(form, "first_flr_sf", "1st Floor SF", min_value=0)
+            second_flr_sf = parse_float(form, "second_flr_sf", "2nd Floor SF", min_value=0)
+            full_bath = parse_int(form, "full_bath", "Full Bathrooms", min_value=0, max_value=20)
+            bedroom_abv_gr = parse_int(form, "bedroom_abv_gr", "Bedrooms Above Ground", min_value=0, max_value=20)
+            tot_rms_abv_grd = parse_int(form, "tot_rms_abv_grd", "Total Rooms Above Ground", min_value=0, max_value=30)
+            overall_qual = parse_int(form, "overall_qual", "Overall Quality", min_value=1, max_value=10)
+            overall_cond = parse_int(form, "overall_cond", "Overall Condition", min_value=1, max_value=10)
+        except ValueError as exc:
+            return templates.TemplateResponse("house.html", {"request": request, "error": str(exc)})
 
         input_data = pd.DataFrame(
             {
@@ -759,7 +1031,7 @@ async def house(request: Request):
 
         model = load_house_model()
         if model is None:
-            return templates.TemplateResponse("house.html", {"request": request, "prediction": "Model file is missing on the server."})
+            return templates.TemplateResponse("house.html", {"request": request, "error": "Model file is missing on the server."})
 
         prediction = model.predict(input_data)[0]
         return templates.TemplateResponse("house.html", {"request": request, "prediction": round(prediction, 2)})
@@ -809,17 +1081,20 @@ async def laptop(request: Request):
         try:
             company = form["company"]
             type_name = form["type"]
-            ram = int(form["ram"])
-            weight = float(form["weight"])
+            ram = parse_int(form, "ram", "RAM", min_value=1)
+            weight = parse_float(form, "weight", "Weight", min_value=0.1)
             touchscreen = 1 if form["touchscreen"] == "Yes" else 0
             ips = 1 if form["ips"] == "Yes" else 0
-            screen_size = float(form["screen_size"])
+            screen_size = parse_float(form, "screen_size", "Screen Size", min_value=1)
             resolution = form["resolution"]
             cpu = form["cpu"]
-            hdd = int(form["hdd"])
-            ssd = int(form["ssd"])
+            hdd = parse_int(form, "hdd", "HDD", min_value=0)
+            ssd = parse_int(form, "ssd", "SSD", min_value=0)
             gpu = form["gpu"]
             osys = form["os"]
+
+            if "x" not in resolution:
+                raise ValueError("Resolution format must be WIDTHxHEIGHT.")
 
             x_res = int(resolution.split("x")[0])
             y_res = int(resolution.split("x")[1])
@@ -915,20 +1190,27 @@ async def sql(
             )
 
         try:
-            subprocess.run([sys.executable, "compare_sql.py"], cwd="SQL COMPARISION", check=True)
+            process = subprocess.run(
+                [sys.executable, "compare_sql.py"],
+                cwd="SQL COMPARISION",
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             summary_df = pd.read_csv("SQL COMPARISION/summary/db_comparison_summary.csv")
             report_df = pd.read_csv("SQL COMPARISION/reports/db_comparison_report.csv")
             return templates.TemplateResponse(
                 "sql.html",
                 {
                     "request": request,
-                    "message": "Comparison completed successfully.",
+                    "message": "Comparison completed successfully." if not process.stdout else f"Comparison completed successfully. {process.stdout.strip()}",
                     "summary": summary_df.to_html(),
                     "report": report_df.to_html(),
                 },
             )
         except subprocess.CalledProcessError as exc:
-            return templates.TemplateResponse("sql.html", {"request": request, "error": f"Error running comparison: {exc}"})
+            details = exc.stderr.strip() if exc.stderr else str(exc)
+            return templates.TemplateResponse("sql.html", {"request": request, "error": f"Error running comparison: {details}"})
 
     return templates.TemplateResponse(
         "sql.html",
@@ -943,9 +1225,11 @@ async def sql(
 async def faq(request: Request):
     if request.method == "POST":
         form = await request.form()
-        url = form.get("url")
+        url = (form.get("url") or "").strip()
         if not url:
             return templates.TemplateResponse("faq.html", {"request": request, "error": "Please provide a URL."})
+        if not is_valid_http_url(url):
+            return templates.TemplateResponse("faq.html", {"request": request, "error": "Please provide a valid URL starting with http:// or https://."})
 
         try:
             extractor, err = load_faq_extractor()
@@ -954,6 +1238,8 @@ async def faq(request: Request):
 
             html = extractor.fetch_url(url)
             faqs = extractor.extract_faqs_from_html(html)
+            if not faqs:
+                return templates.TemplateResponse("faq.html", {"request": request, "error": "No FAQ pairs were detected for the provided URL."})
             return templates.TemplateResponse("faq.html", {"request": request, "faqs": faqs[:10]})
         except Exception as exc:
             return templates.TemplateResponse("faq.html", {"request": request, "error": f"Error extracting FAQs: {exc}"})
@@ -968,4 +1254,11 @@ def api_teams():
 
 @app.on_event("startup")
 def startup_event():
-    print("FastAPI app started successfully")
+    global DATA_STORE_ERROR
+    try:
+        DATA_STORE.initialize()
+        DATA_STORE_ERROR = None
+        print("FastAPI app started successfully with database initialization.")
+    except Exception as exc:
+        DATA_STORE_ERROR = str(exc)
+        print(f"FastAPI app started, but database initialization failed: {exc}")
