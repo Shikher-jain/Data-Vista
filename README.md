@@ -1,83 +1,61 @@
 # Data Vista
 
-Data Vista is a unified collection of data science, machine learning, analytics, and visualization projects in one repository. It combines Flask pages, Streamlit apps, notebooks, and utility scripts into a single portfolio-style platform.
+Data Vista is a multi-project analytics platform with one unified FastAPI backend and multiple AI/ML mini-apps rendered with Jinja templates.
 
-## Highlights
+## What Changed (Architecture)
 
-- 10+ integrated projects across ML, NLP, CV, analytics, and dashboards
-- One landing application with project-specific pages and templates
-- Includes both model training notebooks and runnable app interfaces
-- Good reference repository for end-to-end applied data projects
+- Canonical backend entrypoint is now `main.py`.
+- `app.py` and `fastapi_app.py` are compatibility wrappers that re-export the same FastAPI app.
+- Shared data now uses SQLite (`data_vista.db`) through `data_store.py` for better scalability.
+- Student records are persisted in SQLite and mirrored to `Student_Management/students.json` for backward compatibility with Streamlit/Tkinter tools.
+- GDP dashboard data is seeded into SQLite from `GDP DASHBOARD/data/gdp_data.csv` on startup.
+- Routes have stronger validation and friendlier user-facing error responses.
 
-## Included Projects
+## Project Highlights
 
-1. **Diabetes Prediction**
-Predicts diabetes risk from health indicators such as glucose, insulin, BMI, and age.
+- Diabetes Prediction
+- GDP Dashboard
+- IPL Analytics
+- Skill Advisory (embedding based recommendations)
+- India Census Explorer
+- Weather App
+- House Price Prediction
+- Laptop Price Prediction
+- SQL Comparison Tool
+- FAQ Extractor
+- Student Management
+- Student Attendance (standalone folder workflow)
 
-2. **GDP Dashboard**
-Interactive GDP trend analysis using historical country-level data and visual charts.
+## Tech Stack
 
-3. **IPL Analytics App**
-IPL team, player, and match analysis using ball-by-ball and match datasets.
+- Backend: FastAPI, Jinja2, Uvicorn/Gunicorn
+- Data/ML: pandas, numpy, scikit-learn, sentence-transformers, joblib, pickle
+- Visualization: Plotly, Folium
+- Storage: SQLite (new shared app storage)
+- Utilities: requests, python-dotenv
 
-4. **Skill Advisory**
-Resume-to-role recommendation system based on NLP embeddings and similarity search.
+## Quick Start
 
-5. **India Census Explorer**
-State/district level demographic exploration with map and census-based insights.
-
-6. **Weather App**
-City weather lookup with condition icons and external API integration.
-
-7. **Student Attendance (Face Recognition)**
-OpenCV-based registration, training, and attendance marking pipeline.
-
-8. **Advanced House Price Prediction**
-Feature engineering and model workflows for house price estimation.
-
-9. **SQL Comparison Tool**
-Compares SQL schemas/content and generates CSV reports and summaries.
-
-10. **FAQ Extractor**
-Extracts and serves FAQ-style Q&A from text sources with NLP pipelines.
-
-## Technology Stack
-
-- Backend: Flask, FastAPI (experimental file present), Streamlit
-- Data and ML: Pandas, NumPy, scikit-learn, sentence-transformers
-- Visualization: Plotly
-- Computer Vision: OpenCV, face-recognition
-- Parsing/Scraping/Utilities: BeautifulSoup, lxml, requests, sqlparse, python-dotenv
-
-## Prerequisites
-
-- Python 3.8+
-- pip
-
-## Setup
-
-1. Clone repository
+1. Clone and enter the repo
 
 ```bash
 git clone https://github.com/Shikher-jain/Data-Vista.git
 cd Data-Vista
 ```
 
-2. Create and activate virtual environment
-
-```bash
-python -m venv .venv
-```
+2. Create and activate a virtual environment
 
 Windows (PowerShell):
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
 Linux/macOS:
 
 ```bash
+python -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -87,36 +65,76 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Configure environment variables (Weather App)
+4. Configure environment variables
 
-Create a `.env` file inside `WEATHER APP`:
+Create `.env` in the repository root:
 
 ```env
-WEATHER_API_KEY=your_api_key_here
+WEATHER_API_KEY=your_openweather_api_key
 ```
 
-## Run
+## Run Locally
 
-Start the main Flask app:
+Preferred:
+
+```bash
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Compatibility launcher:
 
 ```bash
 python app.py
 ```
 
-Then open:
+Open:
 
 ```text
-http://127.0.0.1:5000/
+http://127.0.0.1:8000/
 ```
 
-## Repository Layout
+## Production Entry
+
+`Procfile` is configured for ASGI:
+
+```text
+web: gunicorn -k uvicorn.workers.UvicornWorker main:app
+```
+
+## Storage Notes
+
+- Shared database file: `data_vista.db`
+- Created and initialized at startup by `DataVistaStore` in `data_store.py`
+- Seeds GDP data from CSV on first run
+- Migrates student data from JSON if present on first run
+- Keeps JSON in sync after student add/delete operations
+
+## Validation and Error Handling
+
+The main app now includes:
+
+- Form numeric parsing helpers with clear validation messages
+- URL validation for FAQ extraction
+- Better weather API error reporting
+- FastAPI exception handlers for request validation and server errors
+- Generic fallback error template: `templates/error.html`
+
+## Key Files
+
+- `main.py`: canonical FastAPI app and all routes
+- `data_store.py`: SQLite service, migration, and seed logic
+- `app.py`: compatibility launcher for older commands
+- `fastapi_app.py`: compatibility import for older module references
+- `templates/`: UI pages for all modules
+
+## Repo Layout (Top-Level)
 
 ```text
 Data-Vista/
-|-- app.py
 |-- main.py
+|-- app.py
 |-- fastapi_app.py
-|-- requirements.txt
+|-- data_store.py
 |-- templates/
 |-- static/
 |-- ADV HOUSE PREDICTION/
@@ -133,26 +151,9 @@ Data-Vista/
 `-- laptop-price-predictor-regression-project/
 ```
 
-## Notes
-
-- Some projects are standalone and can be run from their own folders.
-- Model/data files are included in subdirectories where required.
-- For project-specific commands, check each subfolder README.
-
-## Contributing
+## Contribution
 
 1. Fork the repository
-2. Create a branch: `git checkout -b feature/your-change`
-3. Commit: `git commit -m "Describe your change"`
-4. Push: `git push origin feature/your-change`
-5. Open a pull request
-
-## Author
-
-Shikher Jain  
-GitHub: https://github.com/Shikher-jain
-
-## Support
-
-- Open a GitHub issue for bugs or feature requests
-- Submit a pull request for improvements
+2. Create a feature branch
+3. Make focused changes with tests where possible
+4. Open a pull request with a clear description

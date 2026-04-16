@@ -10,7 +10,7 @@
             <p class="hero-subtitle">A project blending AI/ML, Data Science, and Web Technologies</p>
             <div class="hero-stats">
                 <div class="stat-item">
-                    <span class="stat-number">10+</span>
+                    <span class="stat-number">12+</span>
                     <span class="stat-label">Projects</span>
                 </div>
                 <div class="stat-item">
@@ -32,6 +32,11 @@
     </div>
 
     <div class="container mt-5">
+        {% if storage_warning %}
+        <div class="alert alert-warning">
+            Persistent storage initialization failed. Some features may be temporarily unavailable.
+        </div>
+        {% endif %}
         
         <div class="row">
             <div class="col-md-4">

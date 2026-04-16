@@ -3,29 +3,361 @@
 {% block title %}Diabetes Prediction{% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h1>Diabetes Prediction</h1>
-        <form method="post">
+<style>
+    .bmi-helper-card {
+        --bmi-primary: #0f766e;
+        --bmi-primary-dark: #0b4f57;
+        --bmi-surface: #f7fbfd;
+        --bmi-surface-alt: #eef9f4;
+        border: 1px solid #cfe8e5;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--bmi-surface) 0%, var(--bmi-surface-alt) 100%);
+        box-shadow: 0 12px 24px rgba(15, 118, 110, 0.12);
+        animation: bmi-card-reveal 280ms ease-out;
+    }
+
+    .bmi-helper-title {
+        color: #0d3b40;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+    }
+
+    .bmi-helper-subtitle {
+        color: #48666d;
+    }
+
+    .bmi-formula-pill {
+        border: 1px solid #b7dcd8;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #0d6a62;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.3rem 0.75rem;
+        white-space: nowrap;
+    }
+
+    .bmi-scale-chip {
+        border: 1px solid #d5ebe8;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #1f5257;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.65rem;
+        margin-right: 0.35rem;
+        margin-top: 0.35rem;
+        display: inline-block;
+    }
+
+    .bmi-calc-btn {
+        background: linear-gradient(135deg, var(--bmi-primary) 0%, var(--bmi-primary-dark) 100%);
+        color: #ffffff;
+        border: none;
+        font-weight: 600;
+    }
+
+    .bmi-calc-btn:hover,
+    .bmi-calc-btn:focus {
+        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 18px rgba(11, 79, 87, 0.25);
+    }
+
+    .bmi-result-text {
+        min-height: 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        padding: 0.5rem 0.75rem;
+    }
+
+    .bmi-result-success {
+        background: #d1e7dd;
+        border: 1px solid #badbcc;
+        color: #0f5132;
+    }
+
+    .bmi-result-error {
+        background: #f8d7da;
+        border: 1px solid #f5c2c7;
+        color: #842029;
+    }
+
+    .dark-mode .bmi-helper-card {
+        border-color: #2b4a4a;
+        background: linear-gradient(135deg, #12232b 0%, #173138 100%);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .dark-mode .bmi-helper-title {
+        color: #d7fbf6;
+    }
+
+    .dark-mode .bmi-helper-subtitle {
+        color: #b9d4d1;
+    }
+
+    .dark-mode .bmi-formula-pill,
+    .dark-mode .bmi-scale-chip {
+        border-color: #315759;
+        background: #0d1c22;
+        color: #bfe8e3;
+    }
+
+    .dark-mode .bmi-result-success {
+        background: #123528;
+        border-color: #1e5d44;
+        color: #a9f1c5;
+    }
+
+    .dark-mode .bmi-result-error {
+        background: #3a1f24;
+        border-color: #7d3945;
+        color: #f4c8d1;
+    }
+
+    @media (max-width: 576px) {
+        .bmi-helper-card .card-body {
+            padding: 1rem !important;
+        }
+
+        .bmi-formula-pill {
+            font-size: 0.75rem;
+        }
+
+        .bmi-scale-chip {
+            margin-right: 0.25rem;
+        }
+    }
+
+    @keyframes bmi-card-reveal {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+<div class="container mt-4">
+    <h1>Diabetes Prediction</h1>
+    <p class="text-muted">Choose a prediction mode below. Basic mode uses the legacy 4-feature model, and advanced mode uses engineered features from the tuned Random Forest workflow.</p>
+
+    <form method="post">
+        <div class="mb-3">
+            <label for="model_type" class="form-label">Prediction Mode</label>
+            <select class="form-select" id="model_type" name="model_type">
+                <option value="basic" {% if selected_model == 'basic' %}selected{% endif %}>Basic (Glucose, Blood Pressure, Insulin, BMI)</option>
+                <option value="advanced" {% if selected_model == 'advanced' %}selected{% endif %}>Advanced (Engineered Features + Tuned Model)</option>
+            </select>
+        </div>
+
+        <div id="basic-fields">
             <div class="mb-3">
                 <label for="glucose" class="form-label">Glucose</label>
-                <input type="text" class="form-control" id="glucose" name="glucose" required>
+                <input type="number" step="any" class="form-control" id="glucose" name="glucose" value="{{ form_data.get('glucose', '') }}">
             </div>
             <div class="mb-3">
                 <label for="bloodpressure" class="form-label">Blood Pressure</label>
-                <input type="text" class="form-control" id="bloodpressure" name="bloodpressure" required>
+                <input type="number" step="any" class="form-control" id="bloodpressure" name="bloodpressure" value="{{ form_data.get('bloodpressure', '') }}">
             </div>
             <div class="mb-3">
                 <label for="insulin" class="form-label">Insulin</label>
-                <input type="text" class="form-control" id="insulin" name="insulin" required>
+                <input type="number" step="any" class="form-control" id="insulin" name="insulin" value="{{ form_data.get('insulin', '') }}">
             </div>
             <div class="mb-3">
                 <label for="bmi" class="form-label">BMI</label>
-                <input type="text" class="form-control" id="bmi" name="bmi" required>
+                <input type="number" step="any" class="form-control" id="bmi" name="bmi" value="{{ form_data.get('bmi', '') }}">
             </div>
-            <button type="submit" class="btn btn-primary">Predict</button>
-        </form>
-        {% if prediction_text %}
-        <div class="alert alert-info mt-3">{{ prediction_text }}</div>
-        {% endif %}
-    </div>
+        </div>
+
+        <div id="advanced-fields">
+            <div class="mb-3">
+                <label for="gender_adv" class="form-label">Gender</label>
+                <select class="form-select" id="gender_adv" name="gender_adv">
+                    <option value="" {% if not form_data.get('gender_adv') %}selected{% endif %}>Select gender</option>
+                    <option value="Female" {% if form_data.get('gender_adv') == 'Female' %}selected{% endif %}>Female</option>
+                    <option value="Male" {% if form_data.get('gender_adv') == 'Male' %}selected{% endif %}>Male</option>
+                    <option value="Other" {% if form_data.get('gender_adv') == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="age_adv" class="form-label">Age</label>
+                <input type="number" step="any" class="form-control" id="age_adv" name="age_adv" value="{{ form_data.get('age_adv', '') }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="hypertension_adv" class="form-label">Hypertension</label>
+                <select class="form-select" id="hypertension_adv" name="hypertension_adv">
+                    <option value="" {% if not form_data.get('hypertension_adv') %}selected{% endif %}>Select value</option>
+                    <option value="0" {% if form_data.get('hypertension_adv') == '0' %}selected{% endif %}>0 (No)</option>
+                    <option value="1" {% if form_data.get('hypertension_adv') == '1' %}selected{% endif %}>1 (Yes)</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="heart_disease_adv" class="form-label">Heart Disease</label>
+                <select class="form-select" id="heart_disease_adv" name="heart_disease_adv">
+                    <option value="" {% if not form_data.get('heart_disease_adv') %}selected{% endif %}>Select value</option>
+                    <option value="0" {% if form_data.get('heart_disease_adv') == '0' %}selected{% endif %}>0 (No)</option>
+                    <option value="1" {% if form_data.get('heart_disease_adv') == '1' %}selected{% endif %}>1 (Yes)</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="smoking_history_adv" class="form-label">Smoking History</label>
+                <select class="form-select" id="smoking_history_adv" name="smoking_history_adv">
+                    <option value="" {% if not form_data.get('smoking_history_adv') %}selected{% endif %}>Select smoking history</option>
+                    <option value="No Info" {% if form_data.get('smoking_history_adv') == 'No Info' %}selected{% endif %}>No Info</option>
+                    <option value="current" {% if form_data.get('smoking_history_adv') == 'current' %}selected{% endif %}>current</option>
+                    <option value="ever" {% if form_data.get('smoking_history_adv') == 'ever' %}selected{% endif %}>ever</option>
+                    <option value="former" {% if form_data.get('smoking_history_adv') == 'former' %}selected{% endif %}>former</option>
+                    <option value="never" {% if form_data.get('smoking_history_adv') == 'never' %}selected{% endif %}>never</option>
+                    <option value="not current" {% if form_data.get('smoking_history_adv') == 'not current' %}selected{% endif %}>not current</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="bmi_adv" class="form-label">BMI</label>
+                <input type="number" step="any" class="form-control" id="bmi_adv" name="bmi_adv" value="{{ form_data.get('bmi_adv', '') }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="hba1c_level_adv" class="form-label">HbA1c Level</label>
+                <input type="number" step="any" class="form-control" id="hba1c_level_adv" name="hba1c_level_adv" value="{{ form_data.get('hba1c_level_adv', '') }}">
+            </div>
+
+            <div class="mb-3">
+                <label for="blood_glucose_level_adv" class="form-label">Blood Glucose Level</label>
+                <input type="number" step="any" class="form-control" id="blood_glucose_level_adv" name="blood_glucose_level_adv" value="{{ form_data.get('blood_glucose_level_adv', '') }}">
+            </div>
+        </div>
+
+        <div class="card bmi-helper-card mb-3">
+            <div class="card-body p-3 p-md-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <h5 class="card-title bmi-helper-title mb-1">Don't know your BMI?</h5>
+                        <p class="bmi-helper-subtitle small mb-0">Enter your weight and height to calculate it. The value will be filled in the currently selected mode.</p>
+                    </div>
+                    <span class="bmi-formula-pill">BMI = kg / m^2</span>
+                </div>
+
+                <div class="d-flex flex-wrap mb-3">
+                    <span class="bmi-scale-chip">Underweight: &lt; 18.5</span>
+                    <span class="bmi-scale-chip">Normal: 18.5 - 24.9</span>
+                    <span class="bmi-scale-chip">Overweight: 25 - 29.9</span>
+                    <span class="bmi-scale-chip">Obese: &gt;= 30</span>
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label for="weight_kg" class="form-label">Weight (kg)</label>
+                        <input type="number" step="any" min="0" class="form-control" id="weight_kg" placeholder="e.g. 70">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="height_cm" class="form-label">Height (cm)</label>
+                        <input type="number" step="any" min="0" class="form-control" id="height_cm" placeholder="e.g. 170">
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="button" class="btn bmi-calc-btn w-100" id="calculate-bmi-btn">Calculate BMI</button>
+                    </div>
+                </div>
+                <div id="bmi-calc-result" class="bmi-result-text mt-3" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Predict</button>
+    </form>
+
+    {% if prediction_text %}
+    <div class="alert alert-info mt-3">{{ prediction_text }}</div>
+    {% endif %}
+</div>
+
+<script>
+    (function () {
+        const modeSelect = document.getElementById('model_type');
+        const basicFields = document.getElementById('basic-fields');
+        const advancedFields = document.getElementById('advanced-fields');
+        const basicBmiInput = document.getElementById('bmi');
+        const advancedBmiInput = document.getElementById('bmi_adv');
+        const weightInput = document.getElementById('weight_kg');
+        const heightInput = document.getElementById('height_cm');
+        const calculateBmiBtn = document.getElementById('calculate-bmi-btn');
+        const bmiCalcResult = document.getElementById('bmi-calc-result');
+
+        function toggleMode() {
+            const isAdvanced = modeSelect && modeSelect.value === 'advanced';
+            if (basicFields) {
+                basicFields.style.display = isAdvanced ? 'none' : 'block';
+            }
+            if (advancedFields) {
+                advancedFields.style.display = isAdvanced ? 'block' : 'none';
+            }
+        }
+
+        function getActiveBmiInput() {
+            const isAdvanced = modeSelect && modeSelect.value === 'advanced';
+            return isAdvanced ? advancedBmiInput : basicBmiInput;
+        }
+
+        function setBmiResult(message, isError) {
+            if (!bmiCalcResult) {
+                return;
+            }
+            bmiCalcResult.textContent = message;
+            bmiCalcResult.classList.remove('bmi-result-error', 'bmi-result-success');
+            bmiCalcResult.classList.add(isError ? 'bmi-result-error' : 'bmi-result-success');
+        }
+
+        function getBmiCategory(value) {
+            if (value < 18.5) {
+                return 'Underweight';
+            }
+            if (value < 25) {
+                return 'Normal';
+            }
+            if (value < 30) {
+                return 'Overweight';
+            }
+            return 'Obese';
+        }
+
+        function calculateAndFillBmi() {
+            const weight = weightInput ? Number.parseFloat(weightInput.value) : NaN;
+            const heightCm = heightInput ? Number.parseFloat(heightInput.value) : NaN;
+
+            if (!Number.isFinite(weight) || !Number.isFinite(heightCm) || weight <= 0 || heightCm <= 0) {
+                setBmiResult('Please enter valid positive values for weight and height.', true);
+                return;
+            }
+
+            const heightM = heightCm / 100;
+            const bmi = weight / (heightM * heightM);
+            const roundedBmi = Math.round(bmi * 100) / 100;
+            const targetInput = getActiveBmiInput();
+
+            if (targetInput) {
+                targetInput.value = roundedBmi;
+            }
+
+            const bmiCategory = getBmiCategory(roundedBmi);
+            const modeLabel = modeSelect && modeSelect.value === 'advanced' ? 'Advanced' : 'Basic';
+            setBmiResult(`BMI: ${roundedBmi} (${bmiCategory}) added to ${modeLabel} BMI field.`, false);
+        }
+
+        if (modeSelect) {
+            modeSelect.addEventListener('change', toggleMode);
+            toggleMode();
+        }
+
+        if (calculateBmiBtn) {
+            calculateBmiBtn.addEventListener('click', calculateAndFillBmi);
+        }
+    })();
+</script>
 {% endblock %}

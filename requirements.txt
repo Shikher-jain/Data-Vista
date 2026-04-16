@@ -6,8 +6,12 @@ jinja2
 python-dotenv
 pandas
 numpy
+matplotlib
+seaborn
 scikit-learn
+imbalanced-learn
 xgboost==1.7.6
+shap
 plotly
 sentence-transformers
 streamlit
