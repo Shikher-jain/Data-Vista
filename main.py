@@ -2,12 +2,14 @@ import os
 import json
 from pathlib import Path
 import importlib.util
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import ast
 import re
 import subprocess
 import warnings
 import sys
+import sqlite3
+import time
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -57,8 +59,510 @@ advanced_diabetes_metadata: Optional[Dict[str, Any]] = None
 advanced_diabetes_error: Optional[str] = None
 house_model = None
 faq_extractor_module = None
+laptop_pipe = None
+laptop_df = None
 
 BASE_DIR = Path(__file__).resolve().parent
+
+SQL_QUERY_PAIRS: List[Dict[str, str]] = [
+    {
+        "id": "employee_spend",
+        "label": "Employee Spend (Slow vs Optimized)",
+        "slow_query": (
+            "SELECT e.name, "
+            "(SELECT SUM(o.amount) FROM orders o WHERE o.emp_id = e.id) AS total_amount "
+            "FROM employees e "
+            "ORDER BY total_amount DESC LIMIT 20;"
+        ),
+        "optimized_query": (
+            "SELECT e.name, COALESCE(SUM(o.amount), 0) AS total_amount "
+            "FROM employees e "
+            "LEFT JOIN orders o ON o.emp_id = e.id "
+            "GROUP BY e.id, e.name "
+            "ORDER BY total_amount DESC LIMIT 20;"
+        ),
+    },
+    {
+        "id": "amount_filter",
+        "label": "Order Amount Filter (Slow vs Optimized)",
+        "slow_query": (
+            "SELECT * FROM orders "
+            "WHERE CAST(amount AS TEXT) LIKE '5%';"
+        ),
+        "optimized_query": (
+            "SELECT order_id, emp_id, amount, status, order_date "
+            "FROM orders "
+            "WHERE amount >= 500 AND amount < 600;"
+        ),
+    },
+    {
+        "id": "product_lookup",
+        "label": "Product Lookup (Slow vs Optimized)",
+        "slow_query": (
+            "SELECT * FROM products "
+            "WHERE LOWER(product_name) = LOWER('Product 050');"
+        ),
+        "optimized_query": (
+            "SELECT product_id, product_name, price "
+            "FROM products "
+            "WHERE product_name = 'Product 050';"
+        ),
+    },
+    {
+        "id": "monthly_summary",
+        "label": "Monthly Revenue (Slow vs Optimized)",
+        "slow_query": (
+            "SELECT strftime('%Y-%m', order_date) AS month_bucket, "
+            "SUM(amount) AS total_amount "
+            "FROM orders "
+            "GROUP BY strftime('%Y-%m', order_date) "
+            "ORDER BY month_bucket;"
+        ),
+        "optimized_query": (
+            "SELECT substr(order_date, 1, 7) AS month_bucket, "
+            "SUM(amount) AS total_amount "
+            "FROM orders "
+            "GROUP BY month_bucket "
+            "ORDER BY month_bucket;"
+        ),
+    },
+]
+
+SQL_EXAMPLE_SCHEMA = """
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS employees;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS departments;
+
+CREATE TABLE departments (
+    dept_id INTEGER PRIMARY KEY,
+    dept_name TEXT NOT NULL
+);
+
+CREATE TABLE employees (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    dept TEXT NOT NULL,
+    email TEXT
+);
+
+CREATE TABLE products (
+    product_id INTEGER PRIMARY KEY,
+    product_name TEXT NOT NULL,
+    price REAL NOT NULL
+);
+
+CREATE TABLE orders (
+    order_id INTEGER PRIMARY KEY,
+    emp_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    status TEXT NOT NULL,
+    order_date TEXT NOT NULL
+);
+
+CREATE INDEX idx_orders_emp_id ON orders(emp_id);
+CREATE INDEX idx_orders_amount ON orders(amount);
+CREATE INDEX idx_orders_status_date ON orders(status, order_date);
+CREATE INDEX idx_products_name ON products(product_name);
+"""
+
+
+def parse_checkbox(form_data, field_name: str, default: bool = False) -> bool:
+    raw = form_data.get(field_name)
+    if raw is None:
+        return default
+    value = str(raw).strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def get_sql_pair_by_id(pair_id: Optional[str]) -> Dict[str, str]:
+    if not pair_id:
+        return SQL_QUERY_PAIRS[0]
+    for pair in SQL_QUERY_PAIRS:
+        if pair["id"] == pair_id:
+            return pair
+    return SQL_QUERY_PAIRS[0]
+
+
+def resolve_groq_api_key(form_key: Optional[str] = None) -> str:
+    if form_key and str(form_key).strip():
+        return str(form_key).strip()
+    return (os.getenv("GROQ_API_KEY") or "").strip()
+
+
+def call_groq_chat_completion(
+    system_prompt: str,
+    user_prompt: str,
+    api_key: str,
+    max_tokens: int = 300,
+    temperature: float = 0.2,
+) -> Tuple[Optional[str], Optional[str]]:
+    if not api_key:
+        return None, "Groq API key is required."
+
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if not content:
+            return None, "Groq response did not contain any summary text."
+        return content.strip(), None
+    except requests.exceptions.RequestException as exc:
+        return None, f"Groq API request failed: {exc}"
+    except Exception as exc:
+        return None, f"Groq response parsing failed: {exc}"
+
+
+def build_sql_benchmark_llm_summary(benchmark: Dict[str, Any], api_key: str) -> Tuple[Optional[str], Optional[str]]:
+    slow = benchmark.get("slow", {})
+    optimized = benchmark.get("optimized", {})
+    prompt = (
+        "Summarize the SQL benchmark in 5 concise bullet points. Include: "
+        "which query is faster, estimated gain, one likely reason, one indexing tip, and one caution.\n\n"
+        f"Slow query avg ms: {slow.get('avg_ms')}\n"
+        f"Optimized query avg ms: {optimized.get('avg_ms')}\n"
+        f"Faster query: {benchmark.get('faster_query')}\n"
+        f"Fallback sample data used: {benchmark.get('used_sample_data')}\n"
+        f"Slow query text: {slow.get('query')}\n"
+        f"Optimized query text: {optimized.get('query')}"
+    )
+    return call_groq_chat_completion(
+        system_prompt="You are a SQL performance analyst. Be precise and practical.",
+        user_prompt=prompt,
+        api_key=api_key,
+        max_tokens=280,
+        temperature=0.1,
+    )
+
+
+def build_faq_llm_cleanup(
+    faqs: List[Dict[str, str]],
+    api_key: str,
+    max_items: int = 12,
+) -> Tuple[Optional[List[Dict[str, str]]], Optional[str]]:
+    if not faqs:
+        return [], None
+
+    sample = faqs[:max_items]
+    sample_json = json.dumps(sample, ensure_ascii=False)
+    prompt = (
+        "Clean and normalize the FAQ JSON array. Keep only useful entries. "
+        "Return JSON only. Rules: remove duplicates, trim whitespace, remove promotional fluff, "
+        "keep clear question and answer fields only.\n\n"
+        f"Input JSON:\n{sample_json}"
+    )
+    content, error = call_groq_chat_completion(
+        system_prompt="You clean FAQ datasets and return strict JSON only.",
+        user_prompt=prompt,
+        api_key=api_key,
+        max_tokens=900,
+        temperature=0.0,
+    )
+    if error:
+        return None, error
+    if not content:
+        return None, "Empty Groq cleanup response."
+
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        text = text.replace("json\n", "", 1).strip()
+
+    try:
+        parsed = json.loads(text)
+    except Exception as exc:
+        return None, f"Could not parse LLM cleanup JSON: {exc}"
+
+    if not isinstance(parsed, list):
+        return None, "LLM cleanup response was not a JSON array."
+
+    cleaned: List[Dict[str, str]] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get("question", "")).strip()
+        answer = str(item.get("answer", "")).strip()
+        if question and answer:
+            cleaned.append({"question": question, "answer": answer})
+
+    if not cleaned:
+        return None, "LLM cleanup did not return valid FAQ entries."
+
+    return cleaned, None
+
+
+def _seed_sql_benchmark_sample_data(conn: sqlite3.Connection) -> None:
+    conn.executescript(SQL_EXAMPLE_SCHEMA)
+
+    dept_names = ["HR", "IT", "Finance", "Sales", "Marketing"]
+    conn.executemany(
+        "INSERT INTO departments (dept_id, dept_name) VALUES (?, ?)",
+        [(idx + 1, name) for idx, name in enumerate(dept_names)],
+    )
+
+    employees = []
+    for idx in range(1, 301):
+        dept = dept_names[(idx - 1) % len(dept_names)]
+        employees.append((idx, f"Employee {idx:03d}", dept, f"employee{idx:03d}@example.com"))
+    conn.executemany(
+        "INSERT INTO employees (id, name, dept, email) VALUES (?, ?, ?, ?)",
+        employees,
+    )
+
+    products = []
+    for idx in range(1, 201):
+        price = round(15 + (idx * 7.35), 2)
+        products.append((idx, f"Product {idx:03d}", price))
+    conn.executemany(
+        "INSERT INTO products (product_id, product_name, price) VALUES (?, ?, ?)",
+        products,
+    )
+
+    statuses = ["Pending", "Completed", "Cancelled"]
+    orders = []
+    for idx in range(1, 5001):
+        emp_id = (idx % 300) + 1
+        amount = round(50 + ((idx * 37) % 950) + ((idx % 7) * 0.19), 2)
+        status = statuses[idx % len(statuses)]
+        month = (idx % 12) + 1
+        day = (idx % 28) + 1
+        order_date = f"2024-{month:02d}-{day:02d}"
+        orders.append((idx, emp_id, amount, status, order_date))
+    conn.executemany(
+        "INSERT INTO orders (order_id, emp_id, amount, status, order_date) VALUES (?, ?, ?, ?, ?)",
+        orders,
+    )
+    conn.commit()
+
+
+def _has_user_tables(conn: sqlite3.Connection) -> bool:
+    cursor = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1"
+    )
+    return cursor.fetchone() is not None
+
+
+def _create_sql_benchmark_connection(schema_sql: str) -> Tuple[sqlite3.Connection, bool, Optional[str]]:
+    warning = None
+    conn = sqlite3.connect(":memory:")
+    used_sample_data = False
+
+    if schema_sql.strip():
+        try:
+            conn.executescript(schema_sql)
+        except Exception as exc:
+            warning = f"Could not load provided SQL schema into SQLite: {exc}. Used built-in sample dataset instead."
+            conn.close()
+            conn = sqlite3.connect(":memory:")
+            _seed_sql_benchmark_sample_data(conn)
+            return conn, True, warning
+
+    if not _has_user_tables(conn):
+        _seed_sql_benchmark_sample_data(conn)
+        used_sample_data = True
+        if warning is None:
+            warning = "No tables found in provided SQL. Used built-in sample dataset for benchmark."
+
+    return conn, used_sample_data, warning
+
+
+def _execute_query_once(conn: sqlite3.Connection, query: str) -> Tuple[int, int]:
+    normalized = query.strip().rstrip(";")
+    if not normalized:
+        raise ValueError("Query is empty.")
+
+    cursor = conn.cursor()
+    starts_with = normalized.lstrip().lower()
+    is_read_query = starts_with.startswith(("select", "with", "pragma", "explain"))
+
+    if is_read_query:
+        cursor.execute(normalized)
+        rows = cursor.fetchall()
+        return len(rows), max(cursor.rowcount, 0)
+
+    conn.execute("BEGIN")
+    try:
+        cursor.execute(normalized)
+        affected = max(cursor.rowcount, 0)
+    finally:
+        conn.rollback()
+    return 0, affected
+
+
+def _run_query_benchmark(
+    conn: sqlite3.Connection,
+    query: str,
+    warmup_runs: int,
+    measured_runs: int,
+) -> Dict[str, Any]:
+    normalized = query.strip().rstrip(";")
+    if not normalized:
+        return {"query": query, "error": "Query is empty."}
+
+    explain_lines: List[str] = []
+    try:
+        explain_cursor = conn.execute(f"EXPLAIN QUERY PLAN {normalized}")
+        explain_rows = explain_cursor.fetchall()
+        explain_lines = [" | ".join(str(part) for part in row) for row in explain_rows]
+    except Exception as exc:
+        explain_lines = [f"Explain not available: {exc}"]
+
+    try:
+        for _ in range(max(warmup_runs, 0)):
+            _execute_query_once(conn, normalized)
+
+        durations_ms: List[float] = []
+        row_count = 0
+        affected_rows = 0
+        for _ in range(max(measured_runs, 1)):
+            start = time.perf_counter()
+            row_count, affected_rows = _execute_query_once(conn, normalized)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            durations_ms.append(elapsed_ms)
+
+        return {
+            "query": normalized,
+            "avg_ms": round(float(np.mean(durations_ms)), 3),
+            "median_ms": round(float(np.median(durations_ms)), 3),
+            "p95_ms": round(float(np.percentile(durations_ms, 95)), 3),
+            "min_ms": round(float(np.min(durations_ms)), 3),
+            "max_ms": round(float(np.max(durations_ms)), 3),
+            "row_count": row_count,
+            "affected_rows": affected_rows,
+            "runs": len(durations_ms),
+            "explain": explain_lines,
+        }
+    except Exception as exc:
+        return {
+            "query": normalized,
+            "error": str(exc),
+            "explain": explain_lines,
+        }
+
+
+def benchmark_query_pair(
+    schema_sql: str,
+    slow_query: str,
+    optimized_query: str,
+    warmup_runs: int,
+    measured_runs: int,
+) -> Dict[str, Any]:
+    warning_messages: List[str] = []
+
+    def _run_benchmark_once(schema_text: str) -> Tuple[Dict[str, Any], Dict[str, Any], bool, Optional[str]]:
+        conn, used_sample_data, warning = _create_sql_benchmark_connection(schema_text)
+        try:
+            slow_stats = _run_query_benchmark(conn, slow_query, warmup_runs, measured_runs)
+            optimized_stats = _run_query_benchmark(conn, optimized_query, warmup_runs, measured_runs)
+        finally:
+            conn.close()
+        return slow_stats, optimized_stats, used_sample_data, warning
+
+    slow_stats, optimized_stats, used_sample_data, warning = _run_benchmark_once(schema_sql)
+    if warning:
+        warning_messages.append(warning)
+
+    if (slow_stats.get("error") or optimized_stats.get("error")) and not used_sample_data:
+        slow_stats, optimized_stats, retry_used_sample, retry_warning = _run_benchmark_once("")
+        used_sample_data = retry_used_sample
+        warning_messages.append(
+            "Provided schema could not execute selected benchmark queries. Retried on built-in sample dataset."
+        )
+        if retry_warning:
+            warning_messages.append(retry_warning)
+
+    faster_query = "n/a"
+    speedup_pct = None
+    if not slow_stats.get("error") and not optimized_stats.get("error"):
+        slow_avg = float(slow_stats["avg_ms"])
+        optimized_avg = float(optimized_stats["avg_ms"])
+        if optimized_avg < slow_avg:
+            faster_query = "optimized"
+            speedup_pct = round(((slow_avg - optimized_avg) / max(slow_avg, 0.0001)) * 100, 2)
+        elif slow_avg < optimized_avg:
+            faster_query = "slow"
+            speedup_pct = round(((optimized_avg - slow_avg) / max(optimized_avg, 0.0001)) * 100, 2)
+        else:
+            faster_query = "tie"
+            speedup_pct = 0.0
+
+    return {
+        "slow": slow_stats,
+        "optimized": optimized_stats,
+        "faster_query": faster_query,
+        "speedup_pct": speedup_pct,
+        "used_sample_data": used_sample_data,
+        "warnings": warning_messages,
+    }
+
+
+def build_sql_page_context(request: Request, **overrides: Any) -> Dict[str, Any]:
+    default_pair = SQL_QUERY_PAIRS[0]
+    context: Dict[str, Any] = {
+        "request": request,
+        "message": "Paste SQL for DB1 and DB2, or upload db1.sql and db2.sql, then run comparison.",
+        "query_pairs": SQL_QUERY_PAIRS,
+        "selected_query_pair": default_pair["id"],
+        "db1_sql_input": "",
+        "db2_sql_input": "",
+        "query_slow_input": default_pair["slow_query"],
+        "query_optimized_input": default_pair["optimized_query"],
+        "warmup_runs_input": 1,
+        "measured_runs_input": 6,
+        "use_llm": False,
+        "llm_insight": None,
+        "llm_error": None,
+        "benchmark": None,
+        "sample_schema_sql": SQL_EXAMPLE_SCHEMA.strip(),
+    }
+    context.update(overrides)
+    return context
+
+
+def build_faq_page_context(request: Request, **overrides: Any) -> Dict[str, Any]:
+    context: Dict[str, Any] = {
+        "request": request,
+        "message": "Enter a URL to extract FAQs from websites (supports static and many dynamic pages).",
+        "url_input": "",
+        "fetch_attempts": [],
+        "crawl_depth": 1,
+        "max_follow_links": 12,
+        "max_workers": 8,
+        "timeout": 20,
+        "min_answer_len": 20,
+        "allow_dynamic": True,
+        "reuse_cache": True,
+        "use_llm_cleanup": False,
+        "cache_file": None,
+        "cache_hit": False,
+        "pages": [],
+        "llm_error": None,
+    }
+    context.update(overrides)
+    return context
 
 
 def load_data_store_class():
@@ -190,6 +694,96 @@ def load_house_model():
     return house_model
 
 
+def _apply_numpy_pickle_compat() -> None:
+    """Create aliases for numpy internals across major-version pickle differences."""
+    try:
+        import numpy.core as np_core
+        import numpy.core.numeric as np_core_numeric
+
+        sys.modules.setdefault("numpy._core", np_core)
+        sys.modules.setdefault("numpy._core.numeric", np_core_numeric)
+    except Exception:
+        # If aliasing fails, we still have a rebuild fallback.
+        return
+
+
+def _rebuild_laptop_artifacts(project_dir: Path) -> Tuple[bool, Optional[str]]:
+    rebuild_script = project_dir / "rebuild_model.py"
+    if not rebuild_script.exists():
+        return False, f"Missing rebuild script: {rebuild_script}"
+
+    try:
+        result = subprocess.run(
+            [sys.executable, str(rebuild_script)],
+            cwd=str(BASE_DIR),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        details = (result.stdout or "").strip()
+        return True, details or None
+    except subprocess.CalledProcessError as exc:
+        details = (exc.stderr or exc.stdout or str(exc)).strip()
+        return False, details or str(exc)
+    except Exception as exc:
+        return False, str(exc)
+
+
+def load_laptop_artifacts() -> Tuple[Any, Optional[pd.DataFrame], Optional[str]]:
+    global laptop_pipe, laptop_df
+
+    if laptop_pipe is not None and laptop_df is not None:
+        return laptop_pipe, laptop_df, None
+
+    project_dir = BASE_DIR / "laptop-price-predictor-regression-project"
+    model_path = project_dir / "pipe.pkl"
+    df_path = project_dir / "df.pkl"
+
+    if not model_path.exists() or not df_path.exists():
+        return None, None, (
+            "Laptop model files are missing. Expected pipe.pkl and df.pkl in "
+            "laptop-price-predictor-regression-project."
+        )
+
+    def _load() -> Tuple[Any, pd.DataFrame]:
+        with open(model_path, "rb") as model_file:
+            pipe = pickle.load(model_file)
+        with open(df_path, "rb") as df_file:
+            df = pickle.load(df_file)
+        return pipe, df
+
+    load_error: Exception = RuntimeError("Unknown laptop artifact load failure")
+
+    try:
+        laptop_pipe, laptop_df = _load()
+        return laptop_pipe, laptop_df, None
+    except ModuleNotFoundError as exc:
+        load_error = exc
+        if "numpy._core.numeric" in str(exc):
+            _apply_numpy_pickle_compat()
+            try:
+                laptop_pipe, laptop_df = _load()
+                return laptop_pipe, laptop_df, None
+            except Exception as retry_exc:
+                load_error = retry_exc
+    except Exception as exc:
+        load_error = exc
+
+    rebuilt, rebuild_details = _rebuild_laptop_artifacts(project_dir)
+    if rebuilt:
+        try:
+            laptop_pipe, laptop_df = _load()
+            return laptop_pipe, laptop_df, None
+        except Exception as exc:
+            return None, None, f"Laptop model rebuild succeeded but loading still failed: {exc}"
+
+    error_message = f"Model or data file load failed: {load_error}"
+    if rebuild_details:
+        error_message = f"{error_message}. Rebuild attempt failed: {rebuild_details}"
+
+    return None, None, error_message
+
+
 def load_faq_extractor():
     global faq_extractor_module
     if faq_extractor_module is not None:
@@ -272,6 +866,27 @@ def parse_int(form_data, field_name: str, label: str, min_value: Optional[int] =
     if max_value is not None and value > max_value:
         raise ValueError(f"{label} must be at most {max_value}.")
     return value
+
+def resolve_grade_range(form_data) -> Tuple[float, float, str]:
+    selected_range = (form_data.get("grade_range") or "1-10").strip()
+    presets = {
+        "1-5": (1.0, 5.0),
+        "1-10": (1.0, 10.0),
+        "1-120": (1.0, 120.0),
+    }
+
+    if selected_range in presets:
+        lower, upper = presets[selected_range]
+        return lower, upper, selected_range
+
+    if selected_range.lower() == "custom":
+        lower = parse_float(form_data, "custom_min", "Custom minimum grade")
+        upper = parse_float(form_data, "custom_max", "Custom maximum grade")
+        if lower >= upper:
+            raise ValueError("Custom maximum grade must be greater than custom minimum grade.")
+        return lower, upper, f"{lower:g}-{upper:g}"
+
+    raise ValueError("Please choose a valid grade range option.")
 
 
 def is_valid_http_url(value: str) -> bool:
@@ -896,40 +1511,218 @@ async def skill(request: Request):
 @app.api_route("/census", methods=["GET", "POST"], response_class=HTMLResponse)
 async def census(request: Request):
     df = pd.read_csv("INDIA CENSUS/india.csv")
-    states = sorted(df["State"].unique())
+    states = sorted(df["State"].dropna().unique())
+
+    for col in ["Population", "Latitude", "Longitude", "literacy_rate", "sex_ratio", "Male", "Female", "Literate"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     if request.method == "POST":
         form = await request.form()
-        selected_state = form.get("state", "Overall INDIA")
+        selected_state = (form.get("state") or "Overall INDIA").strip()
+        selected_x_metric = (form.get("x_metric") or "literacy_rate").strip()
+        selected_y_metric = (form.get("y_metric") or "sex_ratio").strip()
     else:
         selected_state = "Overall INDIA"
+        selected_x_metric = "literacy_rate"
+        selected_y_metric = "sex_ratio"
 
-    if selected_state == "Overall INDIA":
-        state_data = df.groupby("State").agg({"Population": "sum", "Latitude": "mean", "Longitude": "mean"}).reset_index()
-        import folium
+    if selected_state != "Overall INDIA" and selected_state not in states:
+        selected_state = "Overall INDIA"
 
-        folium_map = folium.Map(location=[20.5937, 78.9629], zoom_start=5)
-        for _, row in state_data.iterrows():
-            folium.Marker(location=[row["Latitude"], row["Longitude"]], popup=f"{row['State']}: {row['Population']:,}").add_to(folium_map)
-        map_html = folium_map._repr_html_()
-        filtered_df = df.head(20)
+    is_overall_view = selected_state == "Overall INDIA"
+
+    if is_overall_view:
+        chart_df = (
+            df.groupby("State", as_index=False)
+            .agg(
+                Population=("Population", "sum"),
+                Latitude=("Latitude", "mean"),
+                Longitude=("Longitude", "mean"),
+                literacy_rate=("literacy_rate", "mean"),
+                sex_ratio=("sex_ratio", "mean"),
+                Districts=("District", "nunique"),
+            )
+        )
+        label_col = "State"
+        count_label = "States"
+        table_columns = ["State", "Districts", "Population", "literacy_rate", "sex_ratio"]
+        bar_limit = 15
     else:
-        filtered_df = df[df["State"] == selected_state].head(20)
-        import folium
+        chart_df = df[df["State"] == selected_state].copy()
+        label_col = "District"
+        count_label = "Districts"
+        table_columns = ["District", "Population", "Male", "Female", "Literate", "literacy_rate", "sex_ratio"]
+        bar_limit = 20
 
-        folium_map = folium.Map(location=[filtered_df["Latitude"].mean(), filtered_df["Longitude"].mean()], zoom_start=7)
-        for _, row in filtered_df.iterrows():
-            folium.Marker(location=[row["Latitude"], row["Longitude"]], popup=f"{row['District']}: {row['Population']:,}").add_to(folium_map)
-        map_html = folium_map._repr_html_()
+    metric_candidates = [
+        col
+        for col in chart_df.columns
+        if col != label_col and pd.api.types.is_numeric_dtype(chart_df[col]) and chart_df[col].notna().any()
+    ]
+    preferred_metric_order = ["literacy_rate", "sex_ratio", "Population", "Male", "Female", "Literate", "Districts", "Latitude", "Longitude"]
+    ordered_metrics = [col for col in preferred_metric_order if col in metric_candidates] + [col for col in metric_candidates if col not in preferred_metric_order]
+
+    if not ordered_metrics:
+        ordered_metrics = ["Population"]
+
+    if selected_x_metric not in ordered_metrics:
+        selected_x_metric = "literacy_rate" if "literacy_rate" in ordered_metrics else ordered_metrics[0]
+
+    if selected_y_metric not in ordered_metrics:
+        selected_y_metric = "sex_ratio" if "sex_ratio" in ordered_metrics else ordered_metrics[0]
+
+    if selected_y_metric == selected_x_metric and len(ordered_metrics) > 1:
+        for metric in ordered_metrics:
+            if metric != selected_x_metric:
+                selected_y_metric = metric
+                break
+
+    metric_options = [{"value": metric, "label": metric.replace("_", " ").title()} for metric in ordered_metrics]
+
+    map_source = chart_df.dropna(subset=["Latitude", "Longitude", "Population"]).copy()
+    population_source = chart_df.dropna(subset=["Population"]).copy()
+    literacy_source = chart_df.dropna(subset=["literacy_rate", "sex_ratio", "Population"]).copy()
+    scatter_source = chart_df.dropna(subset=[selected_x_metric, selected_y_metric, "Population"]).copy()
+
+    map_plot_html = None
+    if not map_source.empty:
+        map_color_col = "literacy_rate" if map_source["literacy_rate"].notna().any() else "Population"
+        map_hover_columns = {
+            "Population": ":,.0f",
+            "literacy_rate": ":.2f",
+            "sex_ratio": ":.2f",
+        }
+        if is_overall_view and "Districts" in map_source.columns:
+            map_hover_columns["Districts"] = ":,.0f"
+
+        map_fig = px.scatter_geo(
+            map_source,
+            lat="Latitude",
+            lon="Longitude",
+            size="Population",
+            color=map_color_col,
+            hover_name=label_col,
+            hover_data=map_hover_columns,
+            projection="natural earth",
+            title=("India Census Interactive Map (State Level)" if is_overall_view else f"{selected_state} Census Interactive Map (District Level)"),
+            height=520,
+        )
+        map_fig.update_geos(
+            lataxis_range=[6, 38],
+            lonaxis_range=[68, 98],
+            showcountries=True,
+            countrycolor="#7b8ca0",
+            showland=True,
+            landcolor="#f2f6f4",
+        )
+        map_fig.update_layout(margin=dict(l=0, r=0, t=55, b=0), coloraxis_colorbar_title="Literacy")
+        map_plot_html = pyo.plot(
+            map_fig,
+            output_type="div",
+            include_plotlyjs=False,
+            config={"displaylogo": False, "responsive": True},
+        )
+
+    population_bar_html = None
+    if not population_source.empty:
+        top_population = population_source.sort_values("Population", ascending=False).head(bar_limit)
+        bar_fig = px.bar(
+            top_population,
+            x=label_col,
+            y="Population",
+            color="literacy_rate" if top_population["literacy_rate"].notna().any() else "Population",
+            hover_data={"Population": ":,.0f", "literacy_rate": ":.2f", "sex_ratio": ":.2f"},
+            title=("Top States by Population" if is_overall_view else f"Top Districts by Population in {selected_state}"),
+            height=420,
+        )
+        bar_fig.update_layout(margin=dict(l=20, r=20, t=60, b=20), xaxis_title=label_col, yaxis_title="Population")
+        population_bar_html = pyo.plot(
+            bar_fig,
+            output_type="div",
+            include_plotlyjs=False,
+            config={"displaylogo": False, "responsive": True},
+        )
+
+    demographics_scatter_html = None
+    if not scatter_source.empty:
+        scatter_hover_data = {"Population": ":,.0f"}
+        for metric in [selected_x_metric, selected_y_metric, "literacy_rate", "sex_ratio"]:
+            if metric in scatter_source.columns and metric not in scatter_hover_data:
+                series = scatter_source[metric].dropna()
+                if not series.empty and np.all(np.isclose(series, np.round(series))):
+                    scatter_hover_data[metric] = ":,.0f"
+                else:
+                    scatter_hover_data[metric] = ":.2f"
+
+        x_axis_label = selected_x_metric.replace("_", " ").title()
+        y_axis_label = selected_y_metric.replace("_", " ").title()
+        scatter_fig = px.scatter(
+            scatter_source,
+            x=selected_x_metric,
+            y=selected_y_metric,
+            size="Population",
+            color="Population",
+            hover_name=label_col,
+            hover_data=scatter_hover_data,
+            title=(f"{x_axis_label} vs {y_axis_label}" if is_overall_view else f"{x_axis_label} vs {y_axis_label} in {selected_state}"),
+            height=420,
+        )
+        scatter_fig.update_layout(margin=dict(l=20, r=20, t=60, b=20), xaxis_title=x_axis_label, yaxis_title=y_axis_label)
+        demographics_scatter_html = pyo.plot(
+            scatter_fig,
+            output_type="div",
+            include_plotlyjs=False,
+            config={"displaylogo": False, "responsive": True},
+        )
+
+    total_population = int(population_source["Population"].sum()) if not population_source.empty else 0
+    average_literacy = float(literacy_source["literacy_rate"].mean()) if not literacy_source.empty else None
+    average_sex_ratio = float(literacy_source["sex_ratio"].mean()) if not literacy_source.empty else None
+    unit_count = int(chart_df[label_col].nunique()) if not chart_df.empty else 0
+
+    top_unit = None
+    if not population_source.empty:
+        top_row = population_source.sort_values("Population", ascending=False).iloc[0]
+        top_unit = f"{top_row[label_col]} ({int(top_row['Population']):,})"
+
+    display_df = chart_df.copy()
+    if not display_df.empty:
+        display_df = display_df.sort_values("Population", ascending=False).head(30)
+        display_df = display_df[[col for col in table_columns if col in display_df.columns]].copy()
+
+        for int_col in ["Population", "Male", "Female", "Literate", "Districts"]:
+            if int_col in display_df.columns:
+                display_df[int_col] = display_df[int_col].apply(lambda x: "-" if pd.isna(x) else f"{int(round(float(x))):,}")
+
+        for float_col in ["literacy_rate", "sex_ratio"]:
+            if float_col in display_df.columns:
+                display_df[float_col] = display_df[float_col].apply(lambda x: "-" if pd.isna(x) else f"{float(x):.2f}")
+
+        table_html = display_df.to_html(index=False, classes="table table-striped table-hover")
+    else:
+        table_html = None
 
     return templates.TemplateResponse(
         "census.html",
         {
             "request": request,
-            "df": filtered_df.to_html(index=False),
             "states": states,
             "selected_state": selected_state,
-            "map_html": map_html,
+            "selected_x_metric": selected_x_metric,
+            "selected_y_metric": selected_y_metric,
+            "metric_options": metric_options,
+            "selected_scope": "Overall INDIA" if is_overall_view else selected_state,
+            "total_population": f"{total_population:,}",
+            "average_literacy": None if average_literacy is None else f"{average_literacy:.2f}",
+            "average_sex_ratio": None if average_sex_ratio is None else f"{average_sex_ratio:.2f}",
+            "unit_count": unit_count,
+            "count_label": count_label,
+            "top_unit": top_unit,
+            "map_plot_html": map_plot_html,
+            "population_bar_html": population_bar_html,
+            "demographics_scatter_html": demographics_scatter_html,
+            "census_table": table_html,
         },
     )
 
@@ -947,20 +1740,31 @@ def attendance(request: Request):
 async def student_management(request: Request):
     _, records, error = load_student_records()
     message = None
+    grade_range = "1-10"
+    custom_min = ""
+    custom_max = ""
+    name_input = ""
+    grade_input = ""
 
     if request.method == "POST":
         form = await request.form()
         action = (form.get("action") or "").strip().lower()
-        name = (form.get("name") or "").strip()
+        grade_range = (form.get("grade_range") or "1-10").strip()
+        custom_min = (form.get("custom_min") or "").strip()
+        custom_max = (form.get("custom_max") or "").strip()
+        name_input = (form.get("name") or "").strip()
+        grade_input = (form.get("grade") or "").strip()
+        name = name_input
 
         if action == "add":
-            if not name:
+            if not name or not grade_input:
                 message = "Name and grade are required."
             else:
                 try:
-                    grade = parse_float(form, "grade", "Grade")
+                    min_grade, max_grade, range_label = resolve_grade_range(form)
+                    grade = parse_float(form, "grade", "Grade", min_value=min_grade, max_value=max_grade)
                     DATA_STORE.upsert_student(name, grade)
-                    message = f"Saved {name}."
+                    message = f"Saved {name}. Grade range used: {range_label}."
                 except ValueError as exc:
                     message = str(exc)
                 except Exception as exc:
@@ -988,6 +1792,11 @@ async def student_management(request: Request):
             "records": records,
             "error": error,
             "message": message,
+            "grade_range": grade_range,
+            "custom_min": custom_min,
+            "custom_max": custom_max,
+            "name_input": name_input,
+            "grade_input": grade_input,
             "data_file": str(DATA_STORE.db_path),
             "streamlit_cmd": "streamlit run Student_Management/stud_managementSTREAMLIT.py",
             "tkinter_cmd": "python Student_Management/stud_managementTK.py",
@@ -1053,16 +1862,9 @@ async def laptop(request: Request):
         "model_ready": False,
     }
 
-    model_path = os.path.join("laptop-price-predictor-regression-project", "pipe.pkl")
-    df_path = os.path.join("laptop-price-predictor-regression-project", "df.pkl")
-
-    try:
-        with open(model_path, "rb") as model_file:
-            pipe = pickle.load(model_file)
-        with open(df_path, "rb") as df_file:
-            df = pickle.load(df_file)
-    except Exception as exc:
-        context["error"] = f"Model or data file missing: {exc}"
+    pipe, df, load_error = load_laptop_artifacts()
+    if load_error is not None or pipe is None or df is None:
+        context["error"] = load_error or "Laptop model artifacts are unavailable."
         return templates.TemplateResponse("laptop.html", context)
 
     context.update(
@@ -1115,32 +1917,81 @@ async def sql(
     db2_sql: Optional[str] = Form(None),
     db1_file: Optional[UploadFile] = File(None),
     db2_file: Optional[UploadFile] = File(None),
+    query_pair_id: Optional[str] = Form(None),
+    warmup_runs_raw: Optional[str] = Form(None),
+    measured_runs_raw: Optional[str] = Form(None),
+    use_llm: Optional[str] = Form(None),
+    groq_api_key: Optional[str] = Form(None),
 ):
+    def _looks_like_query(text: str) -> bool:
+        candidate = (text or "").strip().lower()
+        if not candidate:
+            return False
+        token_match = re.match(r"^([a-z_]+)", candidate)
+        token = token_match.group(1) if token_match else ""
+        return token in {"select", "with", "explain", "insert", "update", "delete"}
+
+    db1_sql_input = (db1_sql or "").strip()
+    db2_sql_input = (db2_sql or "").strip()
+    selected_pair = get_sql_pair_by_id(query_pair_id)
+
+    if _looks_like_query(db1_sql_input):
+        query_slow_input = db1_sql_input
+    else:
+        query_slow_input = selected_pair["slow_query"]
+
+    if _looks_like_query(db2_sql_input):
+        query_optimized_input = db2_sql_input
+    else:
+        query_optimized_input = selected_pair["optimized_query"]
+
+    try:
+        warmup_runs = int(str(warmup_runs_raw).strip()) if warmup_runs_raw is not None else 1
+    except ValueError:
+        warmup_runs = 1
+    warmup_runs = max(0, min(warmup_runs, 10))
+
+    try:
+        measured_runs = int(str(measured_runs_raw).strip()) if measured_runs_raw is not None else 6
+    except ValueError:
+        measured_runs = 6
+    measured_runs = max(1, min(measured_runs, 30))
+
+    should_use_llm = str(use_llm or "").strip().lower() in {"1", "true", "yes", "on"}
+
     if request.method == "POST":
         sql_dir = Path("SQL COMPARISION")
         db1_path = sql_dir / "db1.sql"
         db2_path = sql_dir / "db2.sql"
+        db1_text = ""
+        db2_text = ""
 
         has_file_input = bool(db1_file and db1_file.filename) or bool(db2_file and db2_file.filename)
-        has_text_input = bool((db1_sql or "").strip()) or bool((db2_sql or "").strip())
+        has_text_input = bool(db1_sql_input) or bool(db2_sql_input)
+
+        base_context = build_sql_page_context(
+            request,
+            selected_query_pair=selected_pair["id"],
+            db1_sql_input=db1_sql_input,
+            db2_sql_input=db2_sql_input,
+            query_slow_input=query_slow_input,
+            query_optimized_input=query_optimized_input,
+            warmup_runs_input=warmup_runs,
+            measured_runs_input=measured_runs,
+            use_llm=should_use_llm,
+        )
 
         if has_file_input:
             if not (db1_file and db1_file.filename and db2_file and db2_file.filename):
                 return templates.TemplateResponse(
                     "sql.html",
-                    {
-                        "request": request,
-                        "error": "Please upload both files: db1.sql and db2.sql.",
-                    },
+                    {**base_context, "error": "Please upload both files: db1.sql and db2.sql."},
                 )
 
             if not db1_file.filename.lower().endswith(".sql") or not db2_file.filename.lower().endswith(".sql"):
                 return templates.TemplateResponse(
                     "sql.html",
-                    {
-                        "request": request,
-                        "error": "Only .sql files are allowed for upload.",
-                    },
+                    {**base_context, "error": "Only .sql files are allowed for upload."},
                 )
 
             db1_bytes = await db1_file.read()
@@ -1148,10 +1999,7 @@ async def sql(
             if not db1_bytes.strip() or not db2_bytes.strip():
                 return templates.TemplateResponse(
                     "sql.html",
-                    {
-                        "request": request,
-                        "error": "Uploaded SQL files must not be empty.",
-                    },
+                    {**base_context, "error": "Uploaded SQL files must not be empty."},
                 )
 
             try:
@@ -1168,57 +2016,101 @@ async def sql(
             db2_path.write_text(db2_text, encoding="utf-8")
 
         elif has_text_input:
-            if not (db1_sql and db1_sql.strip() and db2_sql and db2_sql.strip()):
+            if not (db1_sql_input and db2_sql_input):
                 return templates.TemplateResponse(
                     "sql.html",
-                    {
-                        "request": request,
-                        "error": "Please provide SQL content for both DB1 and DB2.",
-                    },
+                    {**base_context, "error": "Please provide SQL content for both DB1 and DB2."},
                 )
 
-            db1_path.write_text(db1_sql.strip(), encoding="utf-8")
-            db2_path.write_text(db2_sql.strip(), encoding="utf-8")
+            db1_text = db1_sql_input
+            db2_text = db2_sql_input
+
+            textareas_query_mode = _looks_like_query(db1_text) and _looks_like_query(db2_text)
+            if not textareas_query_mode:
+                db1_path.write_text(db1_text, encoding="utf-8")
+                db2_path.write_text(db2_text, encoding="utf-8")
 
         else:
             return templates.TemplateResponse(
                 "sql.html",
-                {
-                    "request": request,
-                    "error": "Paste SQL in both text areas or upload both .sql files.",
-                },
+                {**base_context, "error": "Paste SQL in both text areas or upload both .sql files."},
             )
 
-        try:
-            process = subprocess.run(
-                [sys.executable, "compare_sql.py"],
-                cwd="SQL COMPARISION",
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            summary_df = pd.read_csv("SQL COMPARISION/summary/db_comparison_summary.csv")
-            report_df = pd.read_csv("SQL COMPARISION/reports/db_comparison_report.csv")
-            return templates.TemplateResponse(
-                "sql.html",
-                {
-                    "request": request,
-                    "message": "Comparison completed successfully." if not process.stdout else f"Comparison completed successfully. {process.stdout.strip()}",
-                    "summary": summary_df.to_html(),
-                    "report": report_df.to_html(),
-                },
-            )
-        except subprocess.CalledProcessError as exc:
-            details = exc.stderr.strip() if exc.stderr else str(exc)
-            return templates.TemplateResponse("sql.html", {"request": request, "error": f"Error running comparison: {details}"})
+        comparison_message = None
+        comparison_error = None
+        summary_html = None
+        report_html = None
 
-    return templates.TemplateResponse(
-        "sql.html",
-        {
-            "request": request,
-            "message": "Paste SQL for DB1 and DB2, or upload db1.sql and db2.sql, then run comparison.",
-        },
-    )
+        textareas_query_mode = _looks_like_query(db1_text) and _looks_like_query(db2_text)
+        if textareas_query_mode and not has_file_input:
+            comparison_message = (
+                "Using DB1/DB2 textareas as query inputs. "
+                "Schema comparison step was skipped for this run."
+            )
+        else:
+            try:
+                process = subprocess.run(
+                    [sys.executable, "compare_sql.py"],
+                    cwd="SQL COMPARISION",
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                summary_df = pd.read_csv("SQL COMPARISION/summary/db_comparison_summary.csv")
+                report_df = pd.read_csv("SQL COMPARISION/reports/db_comparison_report.csv")
+                comparison_message = "Comparison completed successfully."
+                if process.stdout:
+                    comparison_message = f"{comparison_message} {process.stdout.strip()}"
+                summary_html = summary_df.to_html(index=False, classes="table table-striped table-sm")
+                report_html = report_df.to_html(index=False, classes="table table-striped table-sm")
+            except subprocess.CalledProcessError as exc:
+                details = exc.stderr.strip() if exc.stderr else str(exc)
+                comparison_error = f"Error running comparison: {details}"
+
+        benchmark = benchmark_query_pair(
+            schema_sql=db1_text,
+            slow_query=query_slow_input,
+            optimized_query=query_optimized_input,
+            warmup_runs=warmup_runs,
+            measured_runs=measured_runs,
+        )
+
+        llm_insight = None
+        llm_error = None
+        if should_use_llm:
+            api_key = resolve_groq_api_key(groq_api_key)
+            if not api_key:
+                llm_error = "Groq API key is required when LLM summary is enabled. Add GROQ_API_KEY or enter key in form."
+            else:
+                llm_insight, llm_error = build_sql_benchmark_llm_summary(benchmark, api_key)
+
+        message = comparison_message or "Benchmark report generated."
+        if benchmark.get("warnings"):
+            message = f"{message} {benchmark['warnings'][0]}"
+
+        return templates.TemplateResponse(
+            "sql.html",
+            build_sql_page_context(
+                request,
+                message=message,
+                error=comparison_error,
+                summary=summary_html,
+                report=report_html,
+                benchmark=benchmark,
+                llm_insight=llm_insight,
+                llm_error=llm_error,
+                selected_query_pair=selected_pair["id"],
+                db1_sql_input=db1_text,
+                db2_sql_input=db2_text,
+                query_slow_input=query_slow_input,
+                query_optimized_input=query_optimized_input,
+                warmup_runs_input=warmup_runs,
+                measured_runs_input=measured_runs,
+                use_llm=should_use_llm,
+            ),
+        )
+
+    return templates.TemplateResponse("sql.html", build_sql_page_context(request))
 
 
 @app.api_route("/faq", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -1226,25 +2118,200 @@ async def faq(request: Request):
     if request.method == "POST":
         form = await request.form()
         url = (form.get("url") or "").strip()
+
+        def _safe_int(name: str, default: int, min_value: int, max_value: int, label: str) -> Tuple[int, Optional[str]]:
+            raw = (form.get(name) or "").strip()
+            if raw == "":
+                return default, None
+            try:
+                value = int(raw)
+            except ValueError:
+                return default, f"{label} must be a whole number."
+            if value < min_value or value > max_value:
+                return default, f"{label} must be between {min_value} and {max_value}."
+            return value, None
+
+        crawl_depth, depth_error = _safe_int("crawl_depth", 1, 0, 5, "Crawler depth")
+        max_follow_links, links_error = _safe_int("max_follow_links", 12, 1, 120, "Max linked pages")
+        max_workers, workers_error = _safe_int("max_workers", 8, 1, 20, "Max workers")
+        timeout, timeout_error = _safe_int("timeout", 20, 5, 90, "Timeout")
+        min_answer_len, answer_error = _safe_int("min_answer_len", 20, 0, 3000, "Minimum answer length")
+
+        allow_dynamic = parse_checkbox(form, "allow_dynamic", default=True)
+        reuse_cache = parse_checkbox(form, "reuse_cache", default=True)
+        use_llm_cleanup = parse_checkbox(form, "use_llm_cleanup", default=False)
+        groq_api_key = (form.get("groq_api_key") or "").strip()
+
+        base_context = build_faq_page_context(
+            request,
+            url_input=url,
+            crawl_depth=crawl_depth,
+            max_follow_links=max_follow_links,
+            max_workers=max_workers,
+            timeout=timeout,
+            min_answer_len=min_answer_len,
+            allow_dynamic=allow_dynamic,
+            reuse_cache=reuse_cache,
+            use_llm_cleanup=use_llm_cleanup,
+        )
+
+        number_error = depth_error or links_error or workers_error or timeout_error or answer_error
+        if number_error:
+            return templates.TemplateResponse("faq.html", {**base_context, "error": number_error})
+
         if not url:
-            return templates.TemplateResponse("faq.html", {"request": request, "error": "Please provide a URL."})
+            return templates.TemplateResponse("faq.html", {**base_context, "error": "Please provide a URL."})
         if not is_valid_http_url(url):
-            return templates.TemplateResponse("faq.html", {"request": request, "error": "Please provide a valid URL starting with http:// or https://."})
+            return templates.TemplateResponse(
+                "faq.html",
+                {**base_context, "error": "Please provide a valid URL starting with http:// or https://."},
+            )
 
         try:
             extractor, err = load_faq_extractor()
             if err:
-                return templates.TemplateResponse("faq.html", {"request": request, "error": err})
+                return templates.TemplateResponse("faq.html", {**base_context, "error": err})
 
-            html = extractor.fetch_url(url)
-            faqs = extractor.extract_faqs_from_html(html)
+            cache_file = None
+            if hasattr(extractor, "get_qna_jsonl_path"):
+                try:
+                    cache_file = extractor.get_qna_jsonl_path(url)
+                except Exception:
+                    cache_file = None
+
+            if reuse_cache and hasattr(extractor, "load_cached_faqs_for_url"):
+                cached_faqs = extractor.load_cached_faqs_for_url(url)
+                if cached_faqs:
+                    cached_faqs = [
+                        faq
+                        for faq in cached_faqs
+                        if len(str(faq.get("answer", "")).strip()) >= min_answer_len
+                    ]
+
+                    llm_error = None
+                    if use_llm_cleanup and cached_faqs:
+                        api_key = resolve_groq_api_key(groq_api_key)
+                        if not api_key:
+                            llm_error = "Groq API key is required when LLM cleanup is enabled."
+                        else:
+                            sample_size = min(12, len(cached_faqs))
+                            cleaned_sample, llm_error = build_faq_llm_cleanup(cached_faqs[:sample_size], api_key, max_items=sample_size)
+                            if cleaned_sample:
+                                cached_faqs = cleaned_sample + cached_faqs[sample_size:]
+
+                    return templates.TemplateResponse(
+                        "faq.html",
+                        {
+                            **base_context,
+                            "message": f"Loaded {len(cached_faqs)} FAQs from cached JSONL for this URL.",
+                            "faqs": cached_faqs[:30],
+                            "cache_file": cache_file,
+                            "cache_hit": True,
+                            "llm_error": llm_error,
+                        },
+                    )
+
+            extraction_meta = {}
+            crawled_urls: List[str] = []
+
+            if crawl_depth > 0 and hasattr(extractor, "crawl_site"):
+                crawled_urls, faqs = extractor.crawl_site(
+                    url,
+                    max_depth=crawl_depth,
+                    max_workers=max_workers,
+                    timeout=timeout,
+                    allow_dynamic=allow_dynamic,
+                    max_pages=max_follow_links,
+                )
+                extraction_meta = {
+                    "attempts": [],
+                    "warnings": [],
+                    "pages": [{"url": page, "faqs": "n/a"} for page in crawled_urls],
+                }
+            if hasattr(extractor, "extract_faqs_from_url"):
+                if not crawled_urls:
+                    faqs, extraction_meta = extractor.extract_faqs_from_url(
+                        url,
+                        max_follow_links=max_follow_links,
+                        timeout=timeout,
+                        allow_dynamic=allow_dynamic,
+                    )
+            else:
+                html = extractor.fetch_url(url, timeout=timeout)
+                faqs = extractor.extract_faqs_from_html(html)
+
+            if hasattr(extractor, "deduplicate_faqs"):
+                faqs = extractor.deduplicate_faqs(faqs)
+
+            faqs = [
+                faq
+                for faq in faqs
+                if len(str(faq.get("answer", "")).strip()) >= min_answer_len
+            ]
+
+            llm_error = None
+            if use_llm_cleanup and faqs:
+                api_key = resolve_groq_api_key(groq_api_key)
+                if not api_key:
+                    llm_error = "Groq API key is required when LLM cleanup is enabled."
+                else:
+                    sample_size = min(12, len(faqs))
+                    cleaned_sample, llm_error = build_faq_llm_cleanup(faqs[:sample_size], api_key, max_items=sample_size)
+                    if cleaned_sample:
+                        faqs = cleaned_sample + faqs[sample_size:]
+
             if not faqs:
-                return templates.TemplateResponse("faq.html", {"request": request, "error": "No FAQ pairs were detected for the provided URL."})
-            return templates.TemplateResponse("faq.html", {"request": request, "faqs": faqs[:10]})
-        except Exception as exc:
-            return templates.TemplateResponse("faq.html", {"request": request, "error": f"Error extracting FAQs: {exc}"})
+                warning_msgs = []
+                for item in extraction_meta.get("warnings", []):
+                    msg = (item.get("message") or "").strip()
+                    if msg:
+                        warning_msgs.append(msg)
 
-    return templates.TemplateResponse("faq.html", {"request": request, "message": "Enter a URL to extract FAQs from websites."})
+                hint = "No FAQ pairs were detected for the provided URL."
+                if warning_msgs:
+                    hint = f"{hint} Details: {' | '.join(warning_msgs[:2])}"
+
+                return templates.TemplateResponse(
+                    "faq.html",
+                    {
+                        **base_context,
+                        "error": hint,
+                        "fetch_attempts": extraction_meta.get("attempts", []),
+                        "llm_error": llm_error,
+                        "cache_file": cache_file,
+                    },
+                )
+
+            saved_count = 0
+            if hasattr(extractor, "save_faqs_for_url_jsonl"):
+                try:
+                    saved_count, cache_file = extractor.save_faqs_for_url_jsonl(url, faqs)
+                except Exception as exc:
+                    llm_error = (llm_error + " | " if llm_error else "") + f"Could not save cache JSONL: {exc}"
+
+            success_message = f"Extracted {len(faqs)} FAQs from the target site."
+            if saved_count > 0:
+                success_message = f"{success_message} Saved {saved_count} FAQs to JSONL cache."
+
+            return templates.TemplateResponse(
+                "faq.html",
+                {
+                    **base_context,
+                    "message": success_message,
+                    "faqs": faqs[:30],
+                    "fetch_attempts": extraction_meta.get("attempts", []),
+                    "pages": extraction_meta.get("pages", []),
+                    "llm_error": llm_error,
+                    "cache_file": cache_file,
+                },
+            )
+        except Exception as exc:
+            return templates.TemplateResponse(
+                "faq.html",
+                {**base_context, "error": f"Error extracting FAQs: {exc}"},
+            )
+
+    return templates.TemplateResponse("faq.html", build_faq_page_context(request))
 
 
 @app.get("/api/teams")
