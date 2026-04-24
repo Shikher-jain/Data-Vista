@@ -1,4 +1,5 @@
 :root {
+    --navbar-height: 72px;
     --bg: #f3f8f6;
     --bg-soft: #e4f1ec;
     --text: #1a2f2d;
@@ -23,6 +24,7 @@ html {
 
 body {
     margin: 0;
+    padding-top: var(--navbar-height);
     font-family: "Outfit", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     color: var(--text);
     background:
@@ -31,6 +33,10 @@ body {
         var(--bg);
     transition: background-color 0.35s ease, color 0.35s ease;
     min-height: 100vh;
+}
+
+.app-navbar {
+    min-height: var(--navbar-height);
 }
 
 ::selection {
