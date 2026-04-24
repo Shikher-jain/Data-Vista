@@ -106,9 +106,15 @@ def main() -> None:
 
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.15, random_state=2)
 
+    try:
+        encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False, drop="first")
+    except TypeError:
+        # sklearn < 1.2 uses `sparse` instead of `sparse_output`.
+        encoder = OneHotEncoder(handle_unknown="ignore", sparse=False, drop="first")
+
     preprocessor = ColumnTransformer(
         transformers=[
-            ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False, drop="first"), [0, 1, 7, 10, 11]),
+            ("cat", encoder, [0, 1, 7, 10, 11]),
         ],
         remainder="passthrough",
     )
