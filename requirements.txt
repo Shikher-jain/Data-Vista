@@ -19,6 +19,8 @@ opencv-python-headless  # Replaced opencv-python with headless version to reduce
 requests
 beautifulsoup4
 lxml
+playwright
+selenium
 sqlparse
 folium
 contractions
