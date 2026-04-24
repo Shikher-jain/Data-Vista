@@ -19,8 +19,11 @@ model = load_model()
 # Load FAQ data and create embeddings
 @st.cache_data(show_spinner=False)
 def load_faqs(website_name: str):
-
-    path = f"QnA/{website_name}.jsonl"
+    candidate_paths = [
+        f"QnA/{website_name}.jsonl",
+        f"QnA/.{website_name}.jsonl",
+    ]
+    path = next((p for p in candidate_paths if os.path.exists(p)), candidate_paths[0])
     if not os.path.exists(path):
         st.error(f"Error: No data found for {website_name}.jsonl in the QnA folder.")
         st.info("Please make sure you have extracted FAQs using app.py and they are in the correct folder.")
@@ -83,7 +86,12 @@ available_domains = []
 if os.path.exists(qna_folder):
     for f in os.listdir(qna_folder):
         if f.endswith(".jsonl"):
-            available_domains.append(f.replace(".jsonl", ""))
+            domain = f.replace(".jsonl", "")
+            if domain.startswith("."):
+                domain = domain[1:]
+            if domain:
+                available_domains.append(domain)
+available_domains = sorted(set(available_domains))
 
 if not available_domains:
     st.error("No FAQ data found in the QnA folder. Please run the crawler first.")
