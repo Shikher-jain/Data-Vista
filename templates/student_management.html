@@ -25,15 +25,40 @@
         <h5 class="mb-3">Add / Update Student</h5>
         <form method="post">
             <input type="hidden" name="action" value="add">
-            <div class="row g-2 align-items-center">
-                <div class="col-md-6">
-                    <input type="text" class="form-control" name="name" placeholder="Name" required>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label for="name" class="form-label">Name</label>
+                    <input id="name" type="text" class="form-control" name="name" value="{{ name_input or '' }}" placeholder="Name" required>
                 </div>
                 <div class="col-md-3">
-                    <input type="number" step="any" class="form-control" name="grade" placeholder="Grade" required>
+                    <label for="grade" class="form-label">Grade</label>
+                    <input id="grade" type="number" step="any" class="form-control" name="grade" value="{{ grade_input or '' }}" placeholder="Grade" required>
                 </div>
-                <div class="col-md-3 d-grid">
+                <div class="col-md-3">
+                    <label for="grade_range" class="form-label">Grade Range</label>
+                    <select id="grade_range" class="form-select" name="grade_range">
+                        <option value="1-5" {% if grade_range == '1-5' %}selected{% endif %}>1 - 5</option>
+                        <option value="1-10" {% if grade_range == '1-10' %}selected{% endif %}>1 - 10</option>
+                        <option value="1-120" {% if grade_range == '1-120' %}selected{% endif %}>1 - 120</option>
+                        <option value="custom" {% if grade_range == 'custom' %}selected{% endif %}>Custom</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
                     <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </div>
+
+            <div id="custom-range-fields" class="row g-2 mt-2" style="display: none;">
+                <div class="col-md-3">
+                    <label for="custom_min" class="form-label">Custom Min</label>
+                    <input id="custom_min" type="number" step="any" class="form-control" name="custom_min" value="{{ custom_min or '' }}" placeholder="e.g. 0">
+                </div>
+                <div class="col-md-3">
+                    <label for="custom_max" class="form-label">Custom Max</label>
+                    <input id="custom_max" type="number" step="any" class="form-control" name="custom_max" value="{{ custom_max or '' }}" placeholder="e.g. 100">
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <small class="text-muted">Choose custom min/max to validate the entered grade in your own range.</small>
                 </div>
             </div>
         </form>
@@ -71,4 +96,76 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+    function updateGradeRangeUI() {
+        const rangeSelect = document.getElementById('grade_range');
+        const gradeInput = document.getElementById('grade');
+        const customWrapper = document.getElementById('custom-range-fields');
+        const customMin = document.getElementById('custom_min');
+        const customMax = document.getElementById('custom_max');
+
+        if (!rangeSelect || !gradeInput || !customWrapper || !customMin || !customMax) {
+            return;
+        }
+
+        const selected = rangeSelect.value;
+        const presets = {
+            '1-5': [1, 5],
+            '1-10': [1, 10],
+            '1-120': [1, 120],
+        };
+
+        if (selected === 'custom') {
+            customWrapper.style.display = 'flex';
+            customMin.required = true;
+            customMax.required = true;
+
+            const minVal = Number(customMin.value);
+            const maxVal = Number(customMax.value);
+
+            if (!Number.isNaN(minVal)) {
+                gradeInput.min = minVal;
+            } else {
+                gradeInput.removeAttribute('min');
+            }
+
+            if (!Number.isNaN(maxVal)) {
+                gradeInput.max = maxVal;
+            } else {
+                gradeInput.removeAttribute('max');
+            }
+        } else {
+            customWrapper.style.display = 'none';
+            customMin.required = false;
+            customMax.required = false;
+
+            if (presets[selected]) {
+                gradeInput.min = presets[selected][0];
+                gradeInput.max = presets[selected][1];
+            } else {
+                gradeInput.removeAttribute('min');
+                gradeInput.removeAttribute('max');
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const rangeSelect = document.getElementById('grade_range');
+        const customMin = document.getElementById('custom_min');
+        const customMax = document.getElementById('custom_max');
+
+        if (rangeSelect) {
+            rangeSelect.addEventListener('change', updateGradeRangeUI);
+        }
+        if (customMin) {
+            customMin.addEventListener('input', updateGradeRangeUI);
+        }
+        if (customMax) {
+            customMax.addEventListener('input', updateGradeRangeUI);
+        }
+
+        updateGradeRangeUI();
+    });
+</script>
 {% endblock %}

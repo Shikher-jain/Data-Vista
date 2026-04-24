@@ -3,65 +3,227 @@
 {% block title %}SQL Comparison{% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h1>SQL Comparison</h1>
-        <p class="text-muted">Paste SQL for DB1 and DB2, or upload db1.sql and db2.sql (only .sql files), then run comparison.</p>
+<div class="container mt-4">
+    <h1>SQL Comparison</h1>
+    <p class="text-muted">Compare schema, run paired queries (slow vs optimized), and get a speed report.</p>
 
-        <form method="POST" enctype="multipart/form-data" class="mb-3">
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label for="db1_sql" class="form-label">DB1 SQL (Paste)</label>
-                    <textarea class="form-control" id="db1_sql" name="db1_sql" rows="8" placeholder="Paste CREATE TABLE statements for DB1 here"></textarea>
-                </div>
-                <div class="col-md-6">
-                    <label for="db2_sql" class="form-label">DB2 SQL (Paste)</label>
-                    <textarea class="form-control" id="db2_sql" name="db2_sql" rows="8" placeholder="Paste CREATE TABLE statements for DB2 here"></textarea>
-                </div>
+    <form method="POST" enctype="multipart/form-data" class="mb-4">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label for="db1_sql" class="form-label">DB1 SQL (Paste)</label>
+                <textarea class="form-control" id="db1_sql" name="db1_sql" rows="8" placeholder="Paste CREATE TABLE statements for DB1 here">{{ db1_sql_input or '' }}</textarea>
             </div>
-
-            <div class="row g-3 mb-3">
-                <div class="col-md-6">
-                    <label for="db1_file" class="form-label">DB1 SQL File (Upload .sql)</label>
-                    <input class="form-control" type="file" id="db1_file" name="db1_file" accept=".sql">
-                </div>
-                <div class="col-md-6">
-                    <label for="db2_file" class="form-label">DB2 SQL File (Upload .sql)</label>
-                    <input class="form-control" type="file" id="db2_file" name="db2_file" accept=".sql">
-                </div>
-            </div>
-
-            <button type="submit" class="btn btn-primary">Run Comparison</button>
-            <a href="/" class="btn btn-outline-secondary">Back to Home</a>
-        </form>
-
-        {% if message %}
-        <div class="alert alert-info">{{ message }}</div>
-        {% endif %}
-
-        {% if error %}
-        <div class="alert alert-danger">{{ error }}</div>
-        {% endif %}
-
-        {% if summary %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="mb-0">Summary</h3>
-            </div>
-            <div class="card-body table-responsive">
-                {{ summary|safe }}
+            <div class="col-md-6">
+                <label for="db2_sql" class="form-label">DB2 SQL (Paste)</label>
+                <textarea class="form-control" id="db2_sql" name="db2_sql" rows="8" placeholder="Paste CREATE TABLE statements for DB2 here">{{ db2_sql_input or '' }}</textarea>
             </div>
         </div>
-        {% endif %}
 
-        {% if report %}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="mb-0">Detailed Report</h3>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label for="db1_file" class="form-label">DB1 SQL File (Upload .sql)</label>
+                <input class="form-control" type="file" id="db1_file" name="db1_file" accept=".sql">
             </div>
-            <div class="card-body table-responsive">
-                {{ report|safe }}
+            <div class="col-md-6">
+                <label for="db2_file" class="form-label">DB2 SQL File (Upload .sql)</label>
+                <input class="form-control" type="file" id="db2_file" name="db2_file" accept=".sql">
             </div>
         </div>
-        {% endif %}
+
+        <hr>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label for="query_pair_id" class="form-label">Paired Query Set</label>
+                <select class="form-select" id="query_pair_id" name="query_pair_id">
+                    {% for pair in query_pairs %}
+                    <option value="{{ pair.id }}" {% if selected_query_pair == pair.id %}selected{% endif %}>{{ pair.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="warmup_runs_raw" class="form-label">Warmup Runs</label>
+                <input type="number" min="0" max="10" class="form-control" id="warmup_runs_raw" name="warmup_runs_raw" value="{{ warmup_runs_input }}">
+            </div>
+            <div class="col-md-3">
+                <label for="measured_runs_raw" class="form-label">Measured Runs</label>
+                <input type="number" min="1" max="30" class="form-control" id="measured_runs_raw" name="measured_runs_raw" value="{{ measured_runs_input }}">
+            </div>
+        </div>
+
+        <div class="alert alert-secondary py-2">
+            Selecting a paired query set will fill the same DB1/DB2 textareas above as Query A (slow/current) and Query B (optimized).
+        </div>
+
+        <div class="row g-3 mb-3 align-items-end">
+            <div class="col-md-4">
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="use_llm" name="use_llm" value="true" {% if use_llm %}checked{% endif %}>
+                    <label class="form-check-label" for="use_llm">Use LLM summary (Groq)</label>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <label for="groq_api_key" class="form-label">Groq API Key (optional if GROQ_API_KEY env is set)</label>
+                <input type="password" class="form-control" id="groq_api_key" name="groq_api_key" placeholder="gsk_...">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Run Comparison + Benchmark</button>
+        <a href="/" class="btn btn-outline-secondary">Back to Home</a>
+    </form>
+
+    {% if message %}
+    <div class="alert alert-info">{{ message }}</div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    {% if llm_error %}
+    <div class="alert alert-warning">{{ llm_error }}</div>
+    {% endif %}
+
+    {% if benchmark %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="mb-0">Query Benchmark Report</h3>
+        </div>
+        <div class="card-body">
+            <p>
+                <strong>Faster Query:</strong>
+                {% if benchmark.faster_query == 'optimized' %}
+                    Optimized Query
+                {% elif benchmark.faster_query == 'slow' %}
+                    Slow Query
+                {% elif benchmark.faster_query == 'tie' %}
+                    Tie
+                {% else %}
+                    Not available
+                {% endif %}
+                {% if benchmark.speedup_pct is not none %}
+                ({{ benchmark.speedup_pct }}% difference)
+                {% endif %}
+            </p>
+
+            {% if benchmark.used_sample_data %}
+            <p class="text-warning mb-2">Benchmark used built-in sample tables for stable execution.</p>
+            {% endif %}
+
+            {% if benchmark.warnings %}
+                {% for warn in benchmark.warnings %}
+                <p class="text-warning mb-1">{{ warn }}</p>
+                {% endfor %}
+            {% endif %}
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h5>Slow Query Stats</h5>
+                        {% if benchmark.slow.error %}
+                        <p class="text-danger mb-0">{{ benchmark.slow.error }}</p>
+                        {% else %}
+                        <ul class="mb-0">
+                            <li>Avg: {{ benchmark.slow.avg_ms }} ms</li>
+                            <li>Median: {{ benchmark.slow.median_ms }} ms</li>
+                            <li>P95: {{ benchmark.slow.p95_ms }} ms</li>
+                            <li>Min/Max: {{ benchmark.slow.min_ms }} / {{ benchmark.slow.max_ms }} ms</li>
+                            <li>Rows Returned: {{ benchmark.slow.row_count }}</li>
+                        </ul>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="border rounded p-3 h-100">
+                        <h5>Optimized Query Stats</h5>
+                        {% if benchmark.optimized.error %}
+                        <p class="text-danger mb-0">{{ benchmark.optimized.error }}</p>
+                        {% else %}
+                        <ul class="mb-0">
+                            <li>Avg: {{ benchmark.optimized.avg_ms }} ms</li>
+                            <li>Median: {{ benchmark.optimized.median_ms }} ms</li>
+                            <li>P95: {{ benchmark.optimized.p95_ms }} ms</li>
+                            <li>Min/Max: {{ benchmark.optimized.min_ms }} / {{ benchmark.optimized.max_ms }} ms</li>
+                            <li>Rows Returned: {{ benchmark.optimized.row_count }}</li>
+                        </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+    {% endif %}
+
+    {% if llm_insight %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="mb-0">LLM Summary (Groq)</h3>
+        </div>
+        <div class="card-body">
+            <pre class="mb-0" style="white-space: pre-wrap;">{{ llm_insight }}</pre>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if summary %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="mb-0">Schema Summary</h3>
+        </div>
+        <div class="card-body table-responsive">
+            {{ summary|safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if report %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="mb-0">Detailed Comparison Report</h3>
+        </div>
+        <div class="card-body table-responsive">
+            {{ report|safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="mb-0">Example Tables For Fast Testing</h3>
+        </div>
+        <div class="card-body">
+            <p class="mb-2">Use this sample schema if you want quick benchmarking with ready indexes:</p>
+            <pre class="mb-0" style="max-height: 260px; overflow: auto;">{{ sample_schema_sql }}</pre>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const pairData = {{ query_pairs | tojson }};
+    const pairMap = {};
+    for (const pair of pairData) {
+        pairMap[pair.id] = pair;
+    }
+
+    const pairSelect = document.getElementById('query_pair_id');
+    const db1Sql = document.getElementById('db1_sql');
+    const db2Sql = document.getElementById('db2_sql');
+
+    const applyPair = () => {
+        const selected = pairMap[pairSelect.value];
+        if (!selected) {
+            return;
+        }
+        db1Sql.value = selected.slow_query;
+        db2Sql.value = selected.optimized_query;
+        db1Sql.placeholder = selected.slow_query;
+        db2Sql.placeholder = selected.optimized_query;
+    };
+
+    if (pairSelect && db1Sql && db2Sql) {
+        pairSelect.addEventListener('change', applyPair);
+    }
+})();
+</script>
 {% endblock %}

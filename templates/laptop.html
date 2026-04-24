@@ -7,7 +7,7 @@
         <div class="alert alert-danger">{{ error }}</div>
     {% endif %}
     {% if not model_ready %}
-        <div class="alert alert-warning">Laptop model is not ready. Please ensure pipe.pkl and df.pkl are present in laptop-price-predictor-regression-project.</div>
+        <div class="alert alert-warning">Laptop model is not ready. Ensure pipe.pkl and df.pkl exist in laptop-price-predictor-regression-project, or run rebuild_model.py to regenerate compatible artifacts.</div>
     {% endif %}
     {% if model_ready %}
     <form method="post">

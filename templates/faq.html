@@ -3,31 +3,157 @@
 {% block title %}FAQ Extractor{% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h1>FAQ Extractor</h1>
-        {% if message %} 
-        <p>{{ message }}</p>
-        <form method="POST">
-            <div class="mb-3">
-                <label for="url" class="form-label">Website URL</label>
-                <input type="url" class="form-control" id="url" name="url" required>
+<div class="container mt-4">
+    <h1>FAQ Extractor</h1>
+
+    {% if message %}
+    <div class="alert alert-info">{{ message }}</div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    {% if llm_error %}
+    <div class="alert alert-warning">{{ llm_error }}</div>
+    {% endif %}
+
+    <form method="POST" class="mb-4">
+        <div class="mb-3">
+            <label for="url" class="form-label">Website URL</label>
+            <input type="url" class="form-control" id="url" name="url" value="{{ url_input or '' }}" required>
+            <small class="text-muted">Supports static pages and many JavaScript-rendered FAQ pages.</small>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <label for="crawl_depth" class="form-label">Crawler Depth</label>
+                <input type="number" class="form-control" id="crawl_depth" name="crawl_depth" min="0" max="5" value="{{ crawl_depth }}">
             </div>
-            <button type="submit" class="btn btn-primary">Extract FAQs</button>
-        </form>
-        {% endif %}
-        {% if error %}
-        <div class="alert alert-danger">{{ error }}</div>
-        {% endif %}
-        {% if faqs %}
-        <h3>Extracted FAQs</h3>
-        <ul class="list-group">
-            {% for faq in faqs %}
-            <li class="list-group-item">
-                <strong>{{ faq.get('question', '') }}</strong><br>
-                {{ faq.get('answer', '') }}
-            </li>
-            {% endfor %}
-        </ul>
+            <div class="col-md-3">
+                <label for="max_follow_links" class="form-label">Max Linked Pages</label>
+                <input type="number" class="form-control" id="max_follow_links" name="max_follow_links" min="1" max="120" value="{{ max_follow_links }}">
+            </div>
+            <div class="col-md-3">
+                <label for="max_workers" class="form-label">Max Workers</label>
+                <input type="number" class="form-control" id="max_workers" name="max_workers" min="1" max="20" value="{{ max_workers }}">
+            </div>
+            <div class="col-md-3">
+                <label for="timeout" class="form-label">Timeout (sec)</label>
+                <input type="number" class="form-control" id="timeout" name="timeout" min="5" max="90" value="{{ timeout }}">
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <label for="min_answer_len" class="form-label">Min Answer Length</label>
+                <input type="number" class="form-control" id="min_answer_len" name="min_answer_len" min="0" max="3000" value="{{ min_answer_len }}">
+            </div>
+            <div class="col-md-8">
+                <label for="groq_api_key" class="form-label">Groq API Key (optional if GROQ_API_KEY is set)</label>
+                <input type="password" class="form-control" id="groq_api_key" name="groq_api_key" placeholder="gsk_...">
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="allow_dynamic" name="allow_dynamic" value="true" {% if allow_dynamic %}checked{% endif %}>
+                    <label class="form-check-label" for="allow_dynamic">Enable Dynamic Rendering</label>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="reuse_cache" name="reuse_cache" value="true" {% if reuse_cache %}checked{% endif %}>
+                    <label class="form-check-label" for="reuse_cache">Reuse Saved JSONL Cache</label>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="use_llm_cleanup" name="use_llm_cleanup" value="true" {% if use_llm_cleanup %}checked{% endif %}>
+                    <label class="form-check-label" for="use_llm_cleanup">Use LLM Cleanup (Groq)</label>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Extract FAQs</button>
+    </form>
+
+    {% if cache_file %}
+    <div class="alert alert-secondary">
+        Cache File: {{ cache_file }}
+        {% if cache_hit %}
+        (served from cache)
         {% endif %}
     </div>
+    {% endif %}
+
+    {% if pages %}
+    <div class="card mt-3 mb-3">
+        <div class="card-header">
+            <h6 class="mb-0">Crawled Pages</h6>
+        </div>
+        <div class="card-body p-2 table-responsive">
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>URL</th>
+                        <th>FAQs Found</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in pages %}
+                    <tr>
+                        <td>{{ item.url }}</td>
+                        <td>{{ item.faqs }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if fetch_attempts %}
+    <div class="card mt-3 mb-3">
+        <div class="card-header">
+            <h6 class="mb-0">Fetch Attempts</h6>
+        </div>
+        <div class="card-body p-2 table-responsive">
+            <table class="table table-sm table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Success</th>
+                        <th>Signal Score</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in fetch_attempts %}
+                    <tr>
+                        <td>{{ item.method }}</td>
+                        <td>{{ item.success }}</td>
+                        <td>{{ item.score }}</td>
+                        <td>{{ item.error }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if faqs %}
+    <h3>Extracted FAQs</h3>
+    <ul class="list-group mb-4">
+        {% for faq in faqs %}
+        <li class="list-group-item">
+            <strong>{{ faq.get('question', '') }}</strong><br>
+            {{ faq.get('answer', '') }}
+        </li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</div>
 {% endblock %}

@@ -3,19 +3,23 @@
 {% block title %}India Census{% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h1>India Census Data</h1>
-        
-        <a href="https://shikherjain09censusapp.streamlit.app/" 
-            target="_blank" 
-            class="btn btn-success mb-3">
+<div class="container mt-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+        <div>
+            <h1 class="mb-1">India Census Explorer</h1>
+            <p class="text-muted mb-0">Interactive census insights with Plotly visualizations.</p>
+        </div>
+        <a href="https://shikherjain09censusapp.streamlit.app/"
+            target="_blank"
+            class="btn btn-success">
             Open Advanced Census App
         </a>
+    </div>
 
-        
-        <form method="POST">
-            <div class="mb-3">
-                <label for="state" class="form-label">Select State</label>
+    <form method="POST" class="card p-3 mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-lg-5 col-md-6">
+                <label for="state" class="form-label">Select Scope</label>
                 <select class="form-select" id="state" name="state">
                     <option value="Overall INDIA" {% if selected_state == 'Overall INDIA' %}selected{% endif %}>Overall INDIA</option>
                     {% for state in states %}
@@ -23,15 +27,102 @@
                     {% endfor %}
                 </select>
             </div>
-            <button type="submit" class="btn btn-primary">Filter</button>
-        </form>
-        <div class="mt-4">
-            {{ df|safe }}
+            <div class="col-lg-3 col-md-3">
+                <label for="x_metric" class="form-label">X Parameter</label>
+                <select class="form-select" id="x_metric" name="x_metric">
+                    {% for metric in metric_options %}
+                    <option value="{{ metric.value }}" {% if selected_x_metric == metric.value %}selected{% endif %}>{{ metric.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-3">
+                <label for="y_metric" class="form-label">Y Parameter</label>
+                <select class="form-select" id="y_metric" name="y_metric">
+                    {% for metric in metric_options %}
+                    <option value="{{ metric.value }}" {% if selected_y_metric == metric.value %}selected{% endif %}>{{ metric.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-1 col-md-12 d-grid">
+                <button type="submit" class="btn btn-primary">Apply Filter</button>
+            </div>
         </div>
-        {% if map_html %}
-        <div class="mt-4">
-            {{ map_html|safe }}
+    </form>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="card-container h-100">
+                <h6 class="mb-1">Scope</h6>
+                <h4 class="mb-0">{{ selected_scope }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card-container h-100">
+                <h6 class="mb-1">Total Population</h6>
+                <h4 class="mb-0">{{ total_population }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card-container h-100">
+                <h6 class="mb-1">Average Literacy Rate</h6>
+                <h4 class="mb-0">{{ average_literacy if average_literacy else '-' }}</h4>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="card-container h-100">
+                <h6 class="mb-1">{{ count_label }}</h6>
+                <h4 class="mb-0">{{ unit_count }}</h4>
+            </div>
+        </div>
+    </div>
+
+    {% if top_unit %}
+    <div class="alert alert-info">Highest population unit in this scope: {{ top_unit }}</div>
+    {% endif %}
+
+    {% if map_plot_html or population_bar_html or demographics_scatter_html %}
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    {% endif %}
+
+    {% if map_plot_html %}
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Interactive Census Map</h5></div>
+        <div class="card-body">
+            {{ map_plot_html|safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        {% if population_bar_html %}
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="mb-0">Population Ranking</h5></div>
+                <div class="card-body">
+                    {{ population_bar_html|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if demographics_scatter_html %}
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="mb-0">Demographic Relationship ({{ selected_x_metric|replace('_', ' ')|title }} vs {{ selected_y_metric|replace('_', ' ')|title }})</h5></div>
+                <div class="card-body">
+                    {{ demographics_scatter_html|safe }}
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>
+
+    {% if census_table %}
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Top Census Records (Current Scope)</h5></div>
+        <div class="card-body table-responsive">
+            {{ census_table|safe }}
+        </div>
+    </div>
+    {% endif %}
+</div>
 {% endblock %}
