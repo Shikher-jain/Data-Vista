@@ -49,9 +49,8 @@
                 <label for="min_answer_len" class="form-label">Min Answer Length</label>
                 <input type="number" class="form-control" id="min_answer_len" name="min_answer_len" min="0" max="3000" value="{{ min_answer_len }}">
             </div>
-            <div class="col-md-8">
-                <label for="groq_api_key" class="form-label">Groq API Key (optional if GROQ_API_KEY is set)</label>
-                <input type="password" class="form-control" id="groq_api_key" name="groq_api_key" placeholder="gsk_...">
+            <div class="col-md-8 d-flex align-items-end">
+                <small class="text-muted">LLM cleanup uses GROQ_API_KEY from server environment variables.</small>
             </div>
         </div>
 

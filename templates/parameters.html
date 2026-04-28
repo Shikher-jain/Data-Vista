@@ -1,0 +1,432 @@
+{% extends 'base.html' %}
+
+{% block title %}DataVista Parameter Guide{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="mb-1">DataVista Parameter Guide</h1>
+            <p class="text-muted mb-0">Reference for all user-input parameters across all DataVista apps.</p>
+        </div>
+        <a href="/" class="btn btn-outline-secondary">Back to Home</a>
+    </div>
+
+    <div class="alert alert-info">
+        This guide documents page headings, form entries, parameter names, expected values, defaults, and backend validation behavior.
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Quick Navigation</h5></div>
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-4"><a href="#diabetes">Diabetes Prediction</a></div>
+                <div class="col-md-4"><a href="#gdp">GDP Dashboard</a></div>
+                <div class="col-md-4"><a href="#ipl">IPL App</a></div>
+                <div class="col-md-4"><a href="#weather">Weather App</a></div>
+                <div class="col-md-4"><a href="#skill">Skill Advisory</a></div>
+                <div class="col-md-4"><a href="#census">India Census</a></div>
+                <div class="col-md-4"><a href="#attendance">Attendance System</a></div>
+                <div class="col-md-4"><a href="#students">Student Management</a></div>
+                <div class="col-md-4"><a href="#house">House Prediction</a></div>
+                <div class="col-md-4"><a href="#laptop">Laptop Price Predictor</a></div>
+                <div class="col-md-4"><a href="#sql">SQL Comparison</a></div>
+                <div class="col-md-4"><a href="#faq">FAQ Extractor</a></div>
+            </div>
+        </div>
+    </div>
+
+    <section class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">All App Headings and Entries</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>App</th>
+                        <th>Primary Headings</th>
+                        <th>Entries (Form Fields)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Home (/)</td>
+                        <td>Interactive welcome hero, project app cards</td>
+                        <td>None</td>
+                    </tr>
+                    <tr>
+                        <td>Diabetes Prediction (/diabetes)</td>
+                        <td>Diabetes Prediction, Prediction Mode, Don't know your BMI?</td>
+                        <td>model_type, glucose, bloodpressure, insulin, bmi, gender_adv, age_adv, hypertension_adv, heart_disease_adv, smoking_history_adv, bmi_adv, hba1c_level_adv, blood_glucose_level_adv</td>
+                    </tr>
+                    <tr>
+                        <td>GDP Dashboard (/gdp)</td>
+                        <td>GDP Dashboard, GDP over time, GDP in selected year</td>
+                        <td>from_year, to_year, countries (checkbox list)</td>
+                    </tr>
+                    <tr>
+                        <td>IPL App (/ipl)</td>
+                        <td>IPL Stats Dashboard, All IPL Teams, Team vs Team Analysis, Team Record, Batsman Performance, Bowler Performance</td>
+                        <td>option, t1, t2, team, batsman, bowler</td>
+                    </tr>
+                    <tr>
+                        <td>Weather App (/weather)</td>
+                        <td>Weather App</td>
+                        <td>city</td>
+                    </tr>
+                    <tr>
+                        <td>Skill Advisory (/skill)</td>
+                        <td>Personalized Career and Skills Advisor, Top Career Matches</td>
+                        <td>input_type, resume_text, skills</td>
+                    </tr>
+                    <tr>
+                        <td>India Census (/census)</td>
+                        <td>India Census Explorer, Interactive Census Map, Population Ranking, Demographic Relationship</td>
+                        <td>state, x_metric, y_metric</td>
+                    </tr>
+                    <tr>
+                        <td>Attendance System (/attendance)</td>
+                        <td>Attendance System</td>
+                        <td>None (camera preview only)</td>
+                    </tr>
+                    <tr>
+                        <td>Student Management (/students)</td>
+                        <td>Student Management, Add / Update Student, Current students</td>
+                        <td>action, name, grade, grade_range, custom_min, custom_max</td>
+                    </tr>
+                    <tr>
+                        <td>House Prediction (/house)</td>
+                        <td>House Price Prediction</td>
+                        <td>lot_area, year_built, first_flr_sf, second_flr_sf, full_bath, bedroom_abv_gr, tot_rms_abv_grd, overall_qual, overall_cond</td>
+                    </tr>
+                    <tr>
+                        <td>Laptop Price Predictor (/laptop)</td>
+                        <td>Laptop Price Predictor</td>
+                        <td>company, type, ram, weight, touchscreen, ips, screen_size, resolution, cpu, hdd, ssd, gpu, os</td>
+                    </tr>
+                    <tr>
+                        <td>SQL Comparison (/sql)</td>
+                        <td>SQL Comparison, Query Benchmark Report, Slow Query Stats, Optimized Query Stats, LLM Summary, Schema Summary, Detailed Comparison Report</td>
+                        <td>db1_sql, db2_sql, db1_file, db2_file, query_pair_id, warmup_runs_raw, measured_runs_raw, use_llm</td>
+                    </tr>
+                    <tr>
+                        <td>FAQ Extractor (/faq)</td>
+                        <td>FAQ Extractor, Crawled Pages, Fetch Attempts, Extracted FAQs</td>
+                        <td>url, crawl_depth, max_follow_links, max_workers, timeout, min_answer_len, allow_dynamic, reuse_cache, use_llm_cleanup</td>
+                    </tr>
+                    <tr>
+                        <td>Parameter Guide (/parameters)</td>
+                        <td>DataVista Parameter Guide</td>
+                        <td>None</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="diabetes" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Diabetes Prediction (/diabetes)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>model_type</td><td>string</td><td>Yes</td><td>basic or advanced. Defaults to basic.</td></tr>
+                    <tr><td>glucose</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>bloodpressure</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>insulin</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>bmi</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>gender_adv</td><td>string</td><td>Yes (advanced mode)</td><td>Expected values from model metadata (typically Female, Male, Other).</td></tr>
+                    <tr><td>age_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Range: 0 to 120.</td></tr>
+                    <tr><td>hypertension_adv</td><td>int</td><td>Yes (advanced mode)</td><td>0 or 1.</td></tr>
+                    <tr><td>heart_disease_adv</td><td>int</td><td>Yes (advanced mode)</td><td>0 or 1.</td></tr>
+                    <tr><td>smoking_history_adv</td><td>string</td><td>Yes (advanced mode)</td><td>Expected values from metadata (common: No Info, current, ever, former, never, not current).</td></tr>
+                    <tr><td>bmi_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>hba1c_level_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>blood_glucose_level_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Must be a valid number, min 0.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="gdp" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">GDP Dashboard (/gdp)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>from_year</td><td>int</td><td>No</td><td>Range is dataset-driven: min_year to max_year.</td></tr>
+                    <tr><td>to_year</td><td>int</td><td>No</td><td>Range is dataset-driven: min_year to max_year. Must be greater than or equal to from_year.</td></tr>
+                    <tr><td>countries</td><td>list[string]</td><td>No</td><td>Country codes selected via checkboxes. Invalid codes are ignored. Defaults are auto-applied if empty.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="ipl" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">IPL App (/ipl)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>option</td><td>string</td><td>Yes</td><td>Teams, Team vs Team, Team Record, Batsman Stats, Bowler Stats.</td></tr>
+                    <tr><td>t1</td><td>string</td><td>Yes (Team vs Team)</td><td>Must be a valid team.</td></tr>
+                    <tr><td>t2</td><td>string</td><td>Yes (Team vs Team)</td><td>Must be a valid team and different from t1.</td></tr>
+                    <tr><td>team</td><td>string</td><td>Yes (Team Record)</td><td>Must be a valid team.</td></tr>
+                    <tr><td>batsman</td><td>string</td><td>Yes (Batsman Stats)</td><td>Must be a valid player from dataset.</td></tr>
+                    <tr><td>bowler</td><td>string</td><td>Yes (Bowler Stats)</td><td>Must be a valid player from dataset.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="weather" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Weather App (/weather)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>city</td><td>string</td><td>Yes</td><td>City name text input.</td></tr>
+                </tbody>
+            </table>
+            <p class="mb-0"><strong>Server requirement:</strong> WEATHER_API_KEY environment variable must be configured.</p>
+        </div>
+    </section>
+
+    <section id="skill" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Skill Advisory (/skill)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>input_type</td><td>string</td><td>Yes</td><td>Paste Resume or Enter Skills.</td></tr>
+                    <tr><td>resume_text</td><td>string</td><td>Yes (when input_type=Paste Resume)</td><td>Free text resume/profile content.</td></tr>
+                    <tr><td>skills</td><td>string</td><td>Yes (when input_type=Enter Skills)</td><td>Comma-separated skill list.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="census" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">India Census (/census)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>state</td><td>string</td><td>No</td><td>Overall INDIA or a valid state name. Invalid values fallback to Overall INDIA.</td></tr>
+                    <tr><td>x_metric</td><td>string</td><td>No</td><td>Must be one of available numeric metrics for current scope.</td></tr>
+                    <tr><td>y_metric</td><td>string</td><td>No</td><td>Must be one of available numeric metrics for current scope.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="attendance" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Attendance System (/attendance)</h4></div>
+        <div class="card-body">
+            <p class="mb-1"><strong>Form parameters:</strong> None.</p>
+            <p class="mb-0">This page is informational and camera-preview oriented. Recognition flow is run via StudentAttendance scripts.</p>
+        </div>
+    </section>
+
+    <section id="students" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Student Management (/students)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>action</td><td>string</td><td>Yes (POST)</td><td>add or delete.</td></tr>
+                    <tr><td>name</td><td>string</td><td>Yes</td><td>Required for add and delete actions.</td></tr>
+                    <tr><td>grade</td><td>float</td><td>Yes (action=add)</td><td>Validated against selected grade_range.</td></tr>
+                    <tr><td>grade_range</td><td>string</td><td>No</td><td>1-5, 1-10, 1-120, or custom. Default: 1-10.</td></tr>
+                    <tr><td>custom_min</td><td>float</td><td>Yes (grade_range=custom)</td><td>Custom lower bound.</td></tr>
+                    <tr><td>custom_max</td><td>float</td><td>Yes (grade_range=custom)</td><td>Must be greater than custom_min.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="house" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">House Prediction (/house)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>lot_area</td><td>float</td><td>Yes</td><td>Min 0.</td></tr>
+                    <tr><td>year_built</td><td>int</td><td>Yes</td><td>Range 1800 to 2100.</td></tr>
+                    <tr><td>first_flr_sf</td><td>float</td><td>Yes</td><td>Min 0.</td></tr>
+                    <tr><td>second_flr_sf</td><td>float</td><td>Yes</td><td>Min 0.</td></tr>
+                    <tr><td>full_bath</td><td>int</td><td>Yes</td><td>Range 0 to 20.</td></tr>
+                    <tr><td>bedroom_abv_gr</td><td>int</td><td>Yes</td><td>Range 0 to 20.</td></tr>
+                    <tr><td>tot_rms_abv_grd</td><td>int</td><td>Yes</td><td>Range 0 to 30.</td></tr>
+                    <tr><td>overall_qual</td><td>int</td><td>Yes</td><td>Range 1 to 10.</td></tr>
+                    <tr><td>overall_cond</td><td>int</td><td>Yes</td><td>Range 1 to 10.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="laptop" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">Laptop Price Predictor (/laptop)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>company</td><td>string</td><td>Yes</td><td>Must be one of loaded company values from model dataframe.</td></tr>
+                    <tr><td>type</td><td>string</td><td>Yes</td><td>Must be one of loaded TypeName values.</td></tr>
+                    <tr><td>ram</td><td>int</td><td>Yes</td><td>Min 1. UI offers standard RAM options.</td></tr>
+                    <tr><td>weight</td><td>float</td><td>Yes</td><td>Min 0.1.</td></tr>
+                    <tr><td>touchscreen</td><td>string</td><td>Yes</td><td>Yes or No.</td></tr>
+                    <tr><td>ips</td><td>string</td><td>Yes</td><td>Yes or No.</td></tr>
+                    <tr><td>screen_size</td><td>float</td><td>Yes</td><td>Min 1 (UI suggests 10 to 18 inches).</td></tr>
+                    <tr><td>resolution</td><td>string</td><td>Yes</td><td>Must include x separator, format WIDTHxHEIGHT.</td></tr>
+                    <tr><td>cpu</td><td>string</td><td>Yes</td><td>Must be one of loaded CPU brand values.</td></tr>
+                    <tr><td>hdd</td><td>int</td><td>Yes</td><td>Min 0.</td></tr>
+                    <tr><td>ssd</td><td>int</td><td>Yes</td><td>Min 0.</td></tr>
+                    <tr><td>gpu</td><td>string</td><td>Yes</td><td>Must be one of loaded GPU brand values.</td></tr>
+                    <tr><td>os</td><td>string</td><td>Yes</td><td>Must be one of loaded OS values.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="sql" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">SQL Comparison (/sql)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>db1_sql</td><td>string</td><td>Conditional</td><td>Required with db2_sql when using text mode.</td></tr>
+                    <tr><td>db2_sql</td><td>string</td><td>Conditional</td><td>Required with db1_sql when using text mode.</td></tr>
+                    <tr><td>db1_file</td><td>file</td><td>Conditional</td><td>Required with db2_file when using upload mode. Must be .sql and non-empty.</td></tr>
+                    <tr><td>db2_file</td><td>file</td><td>Conditional</td><td>Required with db1_file when using upload mode. Must be .sql and non-empty.</td></tr>
+                    <tr><td>query_pair_id</td><td>string</td><td>No</td><td>One of predefined SQL query pair IDs. Defaults to first pair.</td></tr>
+                    <tr><td>warmup_runs_raw</td><td>int</td><td>No</td><td>Clamped to 0 to 10. Default 1.</td></tr>
+                    <tr><td>measured_runs_raw</td><td>int</td><td>No</td><td>Clamped to 1 to 30. Default 6.</td></tr>
+                    <tr><td>use_llm</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on.</td></tr>
+                </tbody>
+            </table>
+            <p class="mb-1"><strong>Mode behavior:</strong> if both db1_sql and db2_sql look like executable queries, they are treated as slow/optimized benchmark queries and schema-diff is skipped.</p>
+            <p class="mb-0"><strong>Server requirement for LLM:</strong> GROQ_API_KEY environment variable must be configured.</p>
+        </div>
+    </section>
+
+    <section id="faq" class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">FAQ Extractor (/faq)</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Type</th>
+                        <th>Required</th>
+                        <th>Rules / Accepted Values</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>url</td><td>string</td><td>Yes</td><td>Must be a valid http:// or https:// URL.</td></tr>
+                    <tr><td>crawl_depth</td><td>int</td><td>No</td><td>Range 0 to 5. Default 1.</td></tr>
+                    <tr><td>max_follow_links</td><td>int</td><td>No</td><td>Range 1 to 120. Default 12.</td></tr>
+                    <tr><td>max_workers</td><td>int</td><td>No</td><td>Range 1 to 20. Default 8.</td></tr>
+                    <tr><td>timeout</td><td>int</td><td>No</td><td>Range 5 to 90 seconds. Default 20.</td></tr>
+                    <tr><td>min_answer_len</td><td>int</td><td>No</td><td>Range 0 to 3000. Default 20.</td></tr>
+                    <tr><td>allow_dynamic</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on. Default true.</td></tr>
+                    <tr><td>reuse_cache</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on. Default true.</td></tr>
+                    <tr><td>use_llm_cleanup</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on. Default false.</td></tr>
+                </tbody>
+            </table>
+            <p class="mb-0"><strong>Server requirement for LLM cleanup:</strong> GROQ_API_KEY environment variable must be configured.</p>
+        </div>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-header"><h4 class="mb-0">API Endpoint Notes</h4></div>
+        <div class="card-body table-responsive">
+            <table class="table table-striped table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Method</th>
+                        <th>Parameters</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>/api/teams</td>
+                        <td>GET</td>
+                        <td>None</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}

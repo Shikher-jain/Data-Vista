@@ -56,15 +56,12 @@
         </div>
 
         <div class="row g-3 mb-3 align-items-end">
-            <div class="col-md-4">
+            <div class="col-md-12">
                 <div class="form-check mt-2">
                     <input class="form-check-input" type="checkbox" id="use_llm" name="use_llm" value="true" {% if use_llm %}checked{% endif %}>
                     <label class="form-check-label" for="use_llm">Use LLM summary (Groq)</label>
                 </div>
-            </div>
-            <div class="col-md-8">
-                <label for="groq_api_key" class="form-label">Groq API Key (optional if GROQ_API_KEY env is set)</label>
-                <input type="password" class="form-control" id="groq_api_key" name="groq_api_key" placeholder="gsk_...">
+                <small class="text-muted">Groq key is read from server environment variable: GROQ_API_KEY.</small>
             </div>
         </div>
 
@@ -198,9 +195,19 @@
     </div>
 </div>
 
+<script id="query-pairs-json" type="application/json">{{ query_pairs | tojson }}</script>
+
 <script>
 (() => {
-    const pairData = {{ query_pairs | tojson }};
+    const pairDataNode = document.getElementById('query-pairs-json');
+    let pairData = [];
+    if (pairDataNode) {
+        try {
+            pairData = JSON.parse(pairDataNode.textContent || '[]');
+        } catch (err) {
+            pairData = [];
+        }
+    }
     const pairMap = {};
     for (const pair of pairData) {
         pairMap[pair.id] = pair;
@@ -223,6 +230,11 @@
 
     if (pairSelect && db1Sql && db2Sql) {
         pairSelect.addEventListener('change', applyPair);
+
+        // Pre-fill only on first load when both textareas are empty.
+        if (!db1Sql.value.trim() && !db2Sql.value.trim()) {
+            applyPair();
+        }
     }
 })();
 </script>
