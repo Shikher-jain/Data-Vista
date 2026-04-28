@@ -188,9 +188,7 @@ def get_sql_pair_by_id(pair_id: Optional[str]) -> Dict[str, str]:
     return SQL_QUERY_PAIRS[0]
 
 
-def resolve_groq_api_key(form_key: Optional[str] = None) -> str:
-    if form_key and str(form_key).strip():
-        return str(form_key).strip()
+def resolve_groq_api_key() -> str:
     return (os.getenv("GROQ_API_KEY") or "").strip()
 
 
@@ -1169,6 +1167,11 @@ def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "storage_warning": DATA_STORE_ERROR})
 
 
+@app.get("/parameters", response_class=HTMLResponse)
+def parameters_reference(request: Request):
+    return templates.TemplateResponse("parameters.html", {"request": request})
+
+
 @app.get("/favicon.ico")
 def favicon():
     icon_path = Path("static/favicon.ico")
@@ -1921,7 +1924,6 @@ async def sql(
     warmup_runs_raw: Optional[str] = Form(None),
     measured_runs_raw: Optional[str] = Form(None),
     use_llm: Optional[str] = Form(None),
-    groq_api_key: Optional[str] = Form(None),
 ):
     def _looks_like_query(text: str) -> bool:
         candidate = (text or "").strip().lower()
@@ -2078,9 +2080,9 @@ async def sql(
         llm_insight = None
         llm_error = None
         if should_use_llm:
-            api_key = resolve_groq_api_key(groq_api_key)
+            api_key = resolve_groq_api_key()
             if not api_key:
-                llm_error = "Groq API key is required when LLM summary is enabled. Add GROQ_API_KEY or enter key in form."
+                llm_error = "Groq API key is required when LLM summary is enabled. Set GROQ_API_KEY in server environment variables."
             else:
                 llm_insight, llm_error = build_sql_benchmark_llm_summary(benchmark, api_key)
 
@@ -2140,7 +2142,6 @@ async def faq(request: Request):
         allow_dynamic = parse_checkbox(form, "allow_dynamic", default=True)
         reuse_cache = parse_checkbox(form, "reuse_cache", default=True)
         use_llm_cleanup = parse_checkbox(form, "use_llm_cleanup", default=False)
-        groq_api_key = (form.get("groq_api_key") or "").strip()
 
         base_context = build_faq_page_context(
             request,
@@ -2190,9 +2191,9 @@ async def faq(request: Request):
 
                     llm_error = None
                     if use_llm_cleanup and cached_faqs:
-                        api_key = resolve_groq_api_key(groq_api_key)
+                        api_key = resolve_groq_api_key()
                         if not api_key:
-                            llm_error = "Groq API key is required when LLM cleanup is enabled."
+                            llm_error = "Groq API key is required when LLM cleanup is enabled. Set GROQ_API_KEY in server environment variables."
                         else:
                             sample_size = min(12, len(cached_faqs))
                             cleaned_sample, llm_error = build_faq_llm_cleanup(cached_faqs[:sample_size], api_key, max_items=sample_size)
@@ -2251,9 +2252,9 @@ async def faq(request: Request):
 
             llm_error = None
             if use_llm_cleanup and faqs:
-                api_key = resolve_groq_api_key(groq_api_key)
+                api_key = resolve_groq_api_key()
                 if not api_key:
-                    llm_error = "Groq API key is required when LLM cleanup is enabled."
+                    llm_error = "Groq API key is required when LLM cleanup is enabled. Set GROQ_API_KEY in server environment variables."
                 else:
                     sample_size = min(12, len(faqs))
                     cleaned_sample, llm_error = build_faq_llm_cleanup(faqs[:sample_size], api_key, max_items=sample_size)
