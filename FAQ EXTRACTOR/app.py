@@ -4,7 +4,6 @@ import re
 import os
 import json
 from bs4 import BeautifulSoup
-from typing import Dict, List, Optional, Tuple
 
 try:
     import contractions
@@ -32,125 +31,6 @@ FAQ_TEXT_HINTS = [
 PLACEHOLDER_KEYWORDS = ["click here", "learn more", "more info", "link", "reference"]
 
 QUESTION_PATTERN = re.compile(r"\b(what|how|when|where|why|which|who|do|does|did|can|should|is|are|will|there|any)\b.*\?", re.I)
-
-
-def normalize_cache_url(url: str) -> str:
-    parsed = urlparse((url or "").strip())
-    scheme = (parsed.scheme or "https").lower()
-    netloc = parsed.netloc.lower()
-    path = parsed.path or "/"
-    path = re.sub(r"/+$", "", path)
-    if not path:
-        path = "/"
-    query = f"?{parsed.query}" if parsed.query else ""
-    return f"{scheme}://{netloc}{path}{query}"
-
-
-def get_site_name(url: str) -> str:
-    netloc = urlparse(url).netloc
-    return re.sub(r"[^\w]+", "_", netloc)
-
-
-def get_qna_jsonl_path(url: str, qna_folder: str = "QnA", leading_dot: bool = True) -> str:
-    site_name = get_site_name(url)
-    filename = f".{site_name}.jsonl" if leading_dot else f"{site_name}.jsonl"
-    return os.path.join(qna_folder, filename)
-
-
-def get_qna_jsonl_candidates(url: str, qna_folder: str = "QnA") -> List[str]:
-    return [
-        get_qna_jsonl_path(url, qna_folder=qna_folder, leading_dot=True),
-        get_qna_jsonl_path(url, qna_folder=qna_folder, leading_dot=False),
-    ]
-
-
-def _read_jsonl_records(file_path: str) -> List[Dict[str, str]]:
-    records: List[Dict[str, str]] = []
-    if not os.path.exists(file_path):
-        return records
-
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-                if isinstance(payload, dict):
-                    records.append(payload)
-            except json.JSONDecodeError:
-                continue
-    return records
-
-
-def load_cached_faqs_for_url(url: str, qna_folder: str = "QnA") -> List[Dict[str, str]]:
-    normalized_target = normalize_cache_url(url)
-
-    for file_path in get_qna_jsonl_candidates(url, qna_folder=qna_folder):
-        records = _read_jsonl_records(file_path)
-        if not records:
-            continue
-
-        has_source_urls = any("source_url" in row for row in records)
-        if has_source_urls:
-            matched = [
-                {
-                    "question": str(row.get("question", "")).strip(),
-                    "answer": str(row.get("answer", "")).strip(),
-                }
-                for row in records
-                if normalize_cache_url(str(row.get("source_url", ""))) == normalized_target
-            ]
-            matched = [row for row in matched if row["question"] and row["answer"]]
-            if matched:
-                return deduplicate_faqs(matched)
-        else:
-            legacy_rows = [
-                {
-                    "question": str(row.get("question", "")).strip(),
-                    "answer": str(row.get("answer", "")).strip(),
-                }
-                for row in records
-            ]
-            legacy_rows = [row for row in legacy_rows if row["question"] and row["answer"]]
-            if legacy_rows:
-                return deduplicate_faqs(legacy_rows)
-
-    return []
-
-
-def save_faqs_for_url_jsonl(url: str, faqs: List[Dict[str, str]], qna_folder: str = "QnA") -> Tuple[int, str]:
-    os.makedirs(qna_folder, exist_ok=True)
-
-    file_path = get_qna_jsonl_path(url, qna_folder=qna_folder, leading_dot=True)
-    normalized_target = normalize_cache_url(url)
-    clean_faqs = deduplicate_faqs(faqs)
-
-    existing_records = _read_jsonl_records(file_path)
-    retained_records: List[Dict[str, str]] = []
-    for row in existing_records:
-        source_url = str(row.get("source_url", "")).strip()
-        if source_url and normalize_cache_url(source_url) == normalized_target:
-            continue
-        retained_records.append(row)
-
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    new_records = [
-        {
-            "source_url": normalized_target,
-            "question": faq["question"],
-            "answer": faq["answer"],
-            "extracted_at": timestamp,
-        }
-        for faq in clean_faqs
-    ]
-
-    all_records = retained_records + new_records
-    with open(file_path, "w", encoding="utf-8") as f:
-        for row in all_records:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-    return len(new_records), file_path
 
 def clean_answer(text, all_questions):
     if not text:
@@ -199,226 +79,6 @@ def fetch_url(url: str, timeout: int = 15) -> str:
     except Exception as e:
         print(f"[WARN] Failed to fetch {url}: {e}")
         return ""
-
-
-def faq_signal_score(html: str) -> int:
-    """Estimate how likely a page contains FAQ content."""
-    if not html:
-        return 0
-
-    lower_html = html.lower()
-    score = 0
-
-    for keyword in [
-        "faqpage",
-        "frequently asked questions",
-        "accordion",
-        "help center",
-        "knowledge base",
-        "qna",
-        "q&a",
-    ]:
-        if keyword in lower_html:
-            score += 2
-
-    score += lower_html.count("?") // 3
-
-    try:
-        soup = BeautifulSoup(html, "html.parser")
-        score += len(soup.find_all("details"))
-        score += len(soup.find_all("summary"))
-        score += len(soup.find_all("dt"))
-        score += len(soup.find_all("dd"))
-
-        for script in soup.find_all("script", type=lambda t: t and "ld+json" in t):
-            if script.string and "FAQPage" in script.string:
-                score += 5
-    except Exception:
-        pass
-
-    return score
-
-
-def fetch_url_playwright(url: str, timeout: int = 20) -> Tuple[str, str]:
-    """Render JS-heavy pages via Playwright when available."""
-    try:
-        from playwright.sync_api import sync_playwright
-    except Exception as exc:
-        return "", f"Playwright not available: {exc}"
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(user_agent="Mozilla/5.0")
-            page = context.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=timeout * 1000)
-            try:
-                page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
-                pass
-
-            # Expand common FAQ containers.
-            try:
-                page.evaluate("""
-                    () => {
-                        document.querySelectorAll('details').forEach((d) => { d.open = true; });
-                        document.querySelectorAll('[aria-expanded="false"]').forEach((el) => {
-                            try { el.click(); } catch (_) {}
-                        });
-                    }
-                """)
-            except Exception:
-                pass
-
-            html = page.content()
-            browser.close()
-            return html, ""
-    except Exception as exc:
-        return "", f"Playwright render failed: {exc}"
-
-
-def fetch_url_selenium(url: str, timeout: int = 20) -> Tuple[str, str]:
-    """Render JS-heavy pages via Selenium when available."""
-    try:
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-    except Exception as exc:
-        return "", f"Selenium not available: {exc}"
-
-    driver = None
-    try:
-        options = Options()
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("user-agent=Mozilla/5.0")
-
-        # Requires chromedriver available in PATH.
-        driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(timeout)
-        driver.get(url)
-        WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-
-        try:
-            driver.execute_script(
-                """
-                document.querySelectorAll('details').forEach((d) => { d.open = true; });
-                document.querySelectorAll('[aria-expanded="false"]').forEach((el) => {
-                    try { el.click(); } catch (_) {}
-                });
-                """
-            )
-        except Exception:
-            pass
-
-        return driver.page_source, ""
-    except Exception as exc:
-        return "", f"Selenium render failed: {exc}"
-    finally:
-        if driver is not None:
-            try:
-                driver.quit()
-            except Exception:
-                pass
-
-
-def fetch_url_with_fallback(url: str, timeout: int = 20, allow_dynamic: bool = True) -> Tuple[str, Dict[str, List[Dict[str, str]]]]:
-    """Fetch HTML using static requests first, then dynamic renderers if needed."""
-    report: Dict[str, List[Dict[str, str]]] = {"attempts": []}
-
-    best_html = fetch_url(url, timeout=timeout)
-    best_method = "requests"
-    best_score = faq_signal_score(best_html)
-    report["attempts"].append(
-        {
-            "method": "requests",
-            "success": "true" if bool(best_html) else "false",
-            "score": str(best_score),
-            "error": "",
-        }
-    )
-
-    # If static fetch already looks promising, avoid heavy browser startup.
-    if not allow_dynamic or best_score >= 5:
-        report["selected"] = [{"method": best_method, "score": str(best_score)}]
-        return best_html, report
-
-    for method_name, method_fn in [
-        ("playwright", fetch_url_playwright),
-        ("selenium", fetch_url_selenium),
-    ]:
-        dynamic_html, dynamic_error = method_fn(url, timeout=timeout)
-        dynamic_score = faq_signal_score(dynamic_html)
-        report["attempts"].append(
-            {
-                "method": method_name,
-                "success": "true" if bool(dynamic_html) else "false",
-                "score": str(dynamic_score),
-                "error": dynamic_error,
-            }
-        )
-
-        if dynamic_html and (dynamic_score > best_score or (dynamic_score == best_score and len(dynamic_html) > len(best_html))):
-            best_html = dynamic_html
-            best_score = dynamic_score
-            best_method = method_name
-
-    report["selected"] = [{"method": best_method, "score": str(best_score)}]
-    return best_html, report
-
-
-def extract_faqs_from_url(
-    url: str,
-    max_follow_links: int = 6,
-    timeout: int = 20,
-    allow_dynamic: bool = True,
-) -> Tuple[List[Dict[str, str]], Dict[str, List[Dict[str, str]]]]:
-    """Extract FAQs from a URL and a handful of likely FAQ/support child pages."""
-    summary: Dict[str, List[Dict[str, str]]] = {
-        "attempts": [],
-        "pages": [],
-        "warnings": [],
-    }
-
-    root_html, root_report = fetch_url_with_fallback(url, timeout=timeout, allow_dynamic=allow_dynamic)
-    summary["attempts"].extend(root_report.get("attempts", []))
-    summary["pages"].append({"url": url, "faqs": str(0)})
-
-    if not root_html:
-        summary["warnings"].append({"message": "Could not fetch the target page HTML."})
-        return [], summary
-
-    all_faqs = extract_faqs_from_html(root_html)
-    summary["pages"][0]["faqs"] = str(len(all_faqs))
-
-    # Follow likely FAQ links when direct extraction is weak.
-    candidate_links = extract_links(root_html, url)
-    if candidate_links and max_follow_links > 0:
-        for idx, link in enumerate(candidate_links[:max_follow_links]):
-            if link == url:
-                continue
-
-            allow_dynamic_for_link = allow_dynamic and len(all_faqs) < 5 and idx < 3
-            child_html, child_report = fetch_url_with_fallback(link, timeout=timeout, allow_dynamic=allow_dynamic_for_link)
-            summary["attempts"].extend(child_report.get("attempts", []))
-
-            if not child_html:
-                summary["warnings"].append({"message": f"Skipping unreadable linked page: {link}"})
-                continue
-
-            child_faqs = extract_faqs_from_html(child_html)
-            summary["pages"].append({"url": link, "faqs": str(len(child_faqs))})
-            all_faqs.extend(child_faqs)
-
-    deduped = deduplicate_faqs(all_faqs)
-    return deduped, summary
-
-
 def same_domain(url: str, base: str) -> bool:
     return urlparse(url).netloc == urlparse(base).netloc
 
@@ -701,12 +361,8 @@ def extract_faqs_from_html(html: str):
 
     return deduplicate_faqs(faqs)
 
-def process_page(url: str, base_url: str, timeout: int = 20, allow_dynamic: bool = False):
-    if allow_dynamic:
-        html, _ = fetch_url_with_fallback(url, timeout=timeout, allow_dynamic=True)
-    else:
-        html = fetch_url(url, timeout=timeout)
-
+def process_page(url: str, base_url: str):
+    html = fetch_url(url)
     if not html:
         return [], []
 
@@ -731,16 +387,7 @@ def process_page(url: str, base_url: str, timeout: int = 20, allow_dynamic: bool
     links = list(dict.fromkeys(links))
 
     return links, faqs
-
-
-def crawl_site(
-    root_url: str,
-    max_depth: int,
-    max_workers: int,
-    timeout: int = 20,
-    allow_dynamic: bool = False,
-    max_pages: int = 80,
-):
+def crawl_site(root_url: str, max_depth: int, max_workers: int):
     base = root_url
     seen = set()
     seen_lock = Lock()
@@ -753,9 +400,6 @@ def crawl_site(
         if not frontier:
             break
 
-        if len(all_urls) >= max_pages:
-            break
-
         this_batch = []
         with seen_lock:
             for u in frontier:
@@ -763,20 +407,12 @@ def crawl_site(
                     seen.add(u)
                     this_batch.append(u)
 
-        remaining_budget = max_pages - len(all_urls)
-        if remaining_budget <= 0:
-            break
-        this_batch = this_batch[:remaining_budget]
-
         if not this_batch:
             break
 
         next_frontier = []
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
-            future_map = {
-                ex.submit(process_page, u, base, timeout, allow_dynamic): u
-                for u in this_batch
-            }
+            future_map = {ex.submit(process_page, u, base): u for u in this_batch}
             for fut in as_completed(future_map):
                 u = future_map[fut]
                 try:
@@ -798,15 +434,23 @@ def crawl_site(
 def main():
     start_url = input("Enter URL: ")
 
+    def get_site_name(url):
+        netloc = urlparse(url).netloc
+        return re.sub(r"[^\w]+", "_", netloc)
+
+    site_name = get_site_name(start_url)
+
     qna_folder = "QnA"
+    ft_folder = "FineTuning"
     os.makedirs(qna_folder, exist_ok=True)
+    os.makedirs(ft_folder, exist_ok=True)
 
-    qna_file = get_qna_jsonl_path(start_url, qna_folder=qna_folder, leading_dot=True)
+    qna_file = os.path.join(qna_folder, f"{site_name}.jsonl")
+    ft_file = os.path.join(ft_folder, f"{site_name}.jsonl")
 
-    cached_rows = load_cached_faqs_for_url(start_url, qna_folder=qna_folder)
-    if cached_rows:
+    if os.path.exists(qna_file) and os.path.exists(ft_file):
         print(f"FAQs already extracted for {start_url}.")
-        print(f"Use existing file: {qna_file}")
+        print(f"Use existing files: {qna_file} and {ft_file}")
         return
 
     try:
@@ -834,8 +478,12 @@ def main():
 
     filtered = [f for f in faqs if len(f["answer"]) >= min_len]
 
-    saved_count, saved_path = save_faqs_for_url_jsonl(start_url, filtered, qna_folder=qna_folder)
-    print(f"Saved {saved_count} QnA FAQs : {saved_path}")
+    with open(qna_file, "w", encoding="utf-8") as f:
+        for faq in filtered:
+            f.write(json.dumps(faq, ensure_ascii=False) + "\n")
+
+
+    print(f"Saved QnA FAQs : {qna_file}")
 
 if __name__ == "__main__":
     main()
