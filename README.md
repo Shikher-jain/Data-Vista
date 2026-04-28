@@ -7,7 +7,8 @@ Data Vista is a multi-project analytics platform with one unified FastAPI backen
 - v2 [https://data-vista-fastapi.onrender.com](https://data-vista-fastapi.onrender.com)
 - v3 [https://data-vista-1-m4y8.onrender.com](https://data-vista-1-m4y8.onrender.com)
 
-### Video Walkthrough: [https://drive.google.com/file/d/1E-wnjWx6sytiW072_Jjs_jnhIZHunCn1/view?usp=sharing](https://drive.google.com/file/d/1E-wnjWx6sytiW072_Jjs_jnhIZHunCn1/view?usp=sharing)
+### Video Walkthrough: 
+[https://drive.google.com/file/d/1E-wnjWx6sytiW072_Jjs_jnhIZHunCn1/view?usp=sharing](https://drive.google.com/file/d/1E-wnjWx6sytiW072_Jjs_jnhIZHunCn1/view?usp=sharing)
 
 ## What Changed (Architecture)
 
