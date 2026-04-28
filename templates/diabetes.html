@@ -211,12 +211,10 @@
                 <label for="smoking_history_adv" class="form-label">Smoking History</label>
                 <select class="form-select" id="smoking_history_adv" name="smoking_history_adv">
                     <option value="" {% if not form_data.get('smoking_history_adv') %}selected{% endif %}>Select smoking history</option>
-                    <option value="No Info" {% if form_data.get('smoking_history_adv') == 'No Info' %}selected{% endif %}>No Info</option>
+                    <option value="Not applicable" {% if form_data.get('smoking_history_adv') == 'Not applicable' %}selected{% endif %}>Not applicable</option>
                     <option value="current" {% if form_data.get('smoking_history_adv') == 'current' %}selected{% endif %}>current</option>
-                    <option value="ever" {% if form_data.get('smoking_history_adv') == 'ever' %}selected{% endif %}>ever</option>
                     <option value="former" {% if form_data.get('smoking_history_adv') == 'former' %}selected{% endif %}>former</option>
                     <option value="never" {% if form_data.get('smoking_history_adv') == 'never' %}selected{% endif %}>never</option>
-                    <option value="not current" {% if form_data.get('smoking_history_adv') == 'not current' %}selected{% endif %}>not current</option>
                 </select>
             </div>
 
