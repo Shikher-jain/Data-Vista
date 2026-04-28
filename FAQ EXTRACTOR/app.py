@@ -361,8 +361,8 @@ def extract_faqs_from_html(html: str):
 
     return deduplicate_faqs(faqs)
 
-def process_page(url: str, base_url: str):
-    html = fetch_url(url)
+def process_page(url: str, base_url: str, timeout: int = 15):
+    html = fetch_url(url, timeout=timeout)
     if not html:
         return [], []
 
@@ -387,7 +387,14 @@ def process_page(url: str, base_url: str):
     links = list(dict.fromkeys(links))
 
     return links, faqs
-def crawl_site(root_url: str, max_depth: int, max_workers: int):
+def crawl_site(
+    root_url: str,
+    max_depth: int,
+    max_workers: int,
+    timeout: int = 15,
+    allow_dynamic: bool = False,
+    max_pages: int | None = None,
+):
     base = root_url
     seen = set()
     seen_lock = Lock()
@@ -412,7 +419,7 @@ def crawl_site(root_url: str, max_depth: int, max_workers: int):
 
         next_frontier = []
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
-            future_map = {ex.submit(process_page, u, base): u for u in this_batch}
+            future_map = {ex.submit(process_page, u, base, timeout): u for u in this_batch}
             for fut in as_completed(future_map):
                 u = future_map[fut]
                 try:
@@ -423,6 +430,9 @@ def crawl_site(root_url: str, max_depth: int, max_workers: int):
                 except Exception as e:
                     print(f"[WARN] Failed processing {u}: {e}")
                     pass
+
+        if max_pages is not None and len(all_urls) >= max_pages:
+            break
 
         # Deduplicate next frontier
         frontier = list(dict.fromkeys([x for x in next_frontier if x not in seen and same_domain(x, base)]))
