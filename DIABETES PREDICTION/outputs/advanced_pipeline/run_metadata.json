@@ -1,0 +1,32 @@
+{
+  "data_path": "C:\\shikher_jain\\Data-Vista\\DIABETES PREDICTION\\diabetes_prediction_dataset.csv",
+  "output_dir": "C:\\shikher_jain\\Data-Vista\\DIABETES PREDICTION\\outputs\\advanced_pipeline",
+  "best_params": {
+    "n_estimators": 200,
+    "min_samples_split": 5,
+    "min_samples_leaf": 4,
+    "max_depth": 10
+  },
+  "best_cv_recall": 0.6126617013970272,
+  "encoder_maps": {
+    "gender": {
+      "Female": 0,
+      "Male": 1
+    },
+    "smoking_history": {
+      "Not applicable": 0,
+      "current": 1,
+      "former": 2,
+      "never": 3
+    }
+  },
+  "selected_features": [
+    "gender",
+    "hypertension",
+    "heart_disease",
+    "smoking_history",
+    "bmi_age",
+    "glucose_hba1c",
+    "hypertension_heart"
+  ]
+}

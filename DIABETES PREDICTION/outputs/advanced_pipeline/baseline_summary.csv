@@ -1,0 +1,4 @@
+Model,Accuracy,Precision (Diabetic),Recall (Diabetic),F1 (Diabetic)
+Logistic Regression,0.49,0.123,0.53,0.199
+Random Forest,0.872,0.133,0.013,0.023
+XGBoost,0.585,0.12,0.39,0.184

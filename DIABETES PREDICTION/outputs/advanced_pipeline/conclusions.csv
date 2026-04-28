@@ -1,0 +1,6 @@
+Step,Key Finding
+EDA,Strong class imbalance with glycaemic markers carrying the strongest signal.
+Feature Engineering,Interaction terms improved learning signal without target leakage.
+SMOTE,SMOTE improved diabetic recall for recall-focused model configurations.
+Best Model,Tuned Random Forest provided the strongest diabetic recall/F1 trade-off.
+SHAP,glucose_hba1c and bmi_age were dominant model drivers.
