@@ -1,5 +1,6 @@
 import os
 import json
+import inspect
 from pathlib import Path
 import importlib.util
 from typing import Any, Dict, List, Optional, Tuple
@@ -11,6 +12,11 @@ import sys
 import sqlite3
 import time
 from urllib.parse import urlparse
+
+try:
+    from sklearn.exceptions import InconsistentVersionWarning
+except Exception:
+    InconsistentVersionWarning = None
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, File, UploadFile
@@ -37,6 +43,9 @@ warnings.filterwarnings(
     category=FutureWarning,
     message=".*Series.__getitem__ treating keys as positions.*",
 )
+
+if InconsistentVersionWarning is not None:
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
 
 load_dotenv()
 
@@ -647,6 +656,12 @@ def load_diabetes_artifacts():
 def load_advanced_diabetes_artifacts() -> Tuple[Any, Any, Optional[Dict[str, Any]], Optional[str]]:
     global advanced_diabetes_model, advanced_diabetes_scaler, advanced_diabetes_metadata, advanced_diabetes_error
 
+    artifacts_dir = BASE_DIR / "DIABETES PREDICTION" / "outputs" / "advanced_pipeline" / "artifacts"
+    metadata_path = BASE_DIR / "DIABETES PREDICTION" / "outputs" / "advanced_pipeline" / "run_metadata.json"
+    model_path = artifacts_dir / "tuned_random_forest.joblib"
+    scaler_path = artifacts_dir / "engineered_feature_scaler.joblib"
+    artifact_paths = (model_path, scaler_path, metadata_path)
+
     if (
         advanced_diabetes_model is not None
         and advanced_diabetes_scaler is not None
@@ -654,16 +669,17 @@ def load_advanced_diabetes_artifacts() -> Tuple[Any, Any, Optional[Dict[str, Any
     ):
         return advanced_diabetes_model, advanced_diabetes_scaler, advanced_diabetes_metadata, None
 
-    if advanced_diabetes_error is not None:
+    if advanced_diabetes_error is not None and not all(path.exists() for path in artifact_paths):
         return None, None, None, advanced_diabetes_error
 
-    artifacts_dir = Path("DIABETES PREDICTION") / "outputs" / "advanced_pipeline" / "artifacts"
-    metadata_path = Path("DIABETES PREDICTION") / "outputs" / "advanced_pipeline" / "run_metadata.json"
+    if advanced_diabetes_error is not None:
+        advanced_diabetes_error = None
 
     try:
-        advanced_diabetes_model = joblib.load(artifacts_dir / "tuned_random_forest.joblib")
-        advanced_diabetes_scaler = joblib.load(artifacts_dir / "engineered_feature_scaler.joblib")
+        advanced_diabetes_model = joblib.load(model_path)
+        advanced_diabetes_scaler = joblib.load(scaler_path)
         advanced_diabetes_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        advanced_diabetes_error = None
         return advanced_diabetes_model, advanced_diabetes_scaler, advanced_diabetes_metadata, None
     except FileNotFoundError:
         advanced_diabetes_model = None
@@ -680,6 +696,20 @@ def load_advanced_diabetes_artifacts() -> Tuple[Any, Any, Optional[Dict[str, Any
         advanced_diabetes_metadata = None
         advanced_diabetes_error = f"Could not load advanced diabetes artifacts: {exc}"
         return None, None, None, advanced_diabetes_error
+
+
+def normalize_smoking_history_value(value: str) -> str:
+    normalized = (value or "").strip()
+    if not normalized:
+        return normalized
+
+    legacy_aliases = {
+        "no info": "Not applicable",
+        "not applicable": "Not applicable",
+        "ever": "former",
+        "not current": "former",
+    }
+    return legacy_aliases.get(normalized.lower(), normalized)
 
 
 def load_house_model():
@@ -802,6 +832,18 @@ def load_faq_extractor():
         return faq_extractor_module, None
     except Exception as exc:
         return None, f"Could not import FAQ extractor: {exc}"
+
+
+def _filter_supported_kwargs(func: Any, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        signature = inspect.signature(func)
+    except (TypeError, ValueError):
+        return kwargs
+
+    if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in signature.parameters.values()):
+        return kwargs
+
+    return {key: value for key, value in kwargs.items() if key in signature.parameters}
 
 
 def load_student_records():
@@ -1210,7 +1252,7 @@ async def diabetes(request: Request):
 
             try:
                 gender = (form.get("gender_adv") or "").strip()
-                smoking_history = (form.get("smoking_history_adv") or "").strip()
+                smoking_history = normalize_smoking_history_value(form.get("smoking_history_adv") or "")
                 age = parse_float(form, "age_adv", "Age", min_value=0, max_value=120)
                 hypertension = parse_int(form, "hypertension_adv", "Hypertension", min_value=0, max_value=1)
                 heart_disease = parse_int(form, "heart_disease_adv", "Heart Disease", min_value=0, max_value=1)
@@ -1904,7 +1946,11 @@ async def laptop(request: Request):
             x_res = int(resolution.split("x")[0])
             y_res = int(resolution.split("x")[1])
             ppi = ((x_res**2) + (y_res**2)) ** 0.5 / screen_size
-            query = np.array([company, type_name, ram, weight, touchscreen, ips, ppi, cpu, hdd, ssd, gpu, osys]).reshape(1, 12)
+            feature_columns = [column for column in df.columns if column != "Price"]
+            query = pd.DataFrame(
+                [[company, type_name, ram, weight, touchscreen, ips, ppi, cpu, hdd, ssd, gpu, osys]],
+                columns=feature_columns,
+            )
             pred = int(np.exp(pipe.predict(query)[0]))
             context["prediction"] = f"The predicted price of this configuration is INR {pred}"
         except Exception as exc:
@@ -2216,14 +2262,17 @@ async def faq(request: Request):
             crawled_urls: List[str] = []
 
             if crawl_depth > 0 and hasattr(extractor, "crawl_site"):
-                crawled_urls, faqs = extractor.crawl_site(
-                    url,
-                    max_depth=crawl_depth,
-                    max_workers=max_workers,
-                    timeout=timeout,
-                    allow_dynamic=allow_dynamic,
-                    max_pages=max_follow_links,
+                crawl_kwargs = _filter_supported_kwargs(
+                    extractor.crawl_site,
+                    {
+                        "max_depth": crawl_depth,
+                        "max_workers": max_workers,
+                        "timeout": timeout,
+                        "allow_dynamic": allow_dynamic,
+                        "max_pages": max_follow_links,
+                    },
                 )
+                crawled_urls, faqs = extractor.crawl_site(url, **crawl_kwargs)
                 extraction_meta = {
                     "attempts": [],
                     "warnings": [],
@@ -2231,12 +2280,15 @@ async def faq(request: Request):
                 }
             if hasattr(extractor, "extract_faqs_from_url"):
                 if not crawled_urls:
-                    faqs, extraction_meta = extractor.extract_faqs_from_url(
-                        url,
-                        max_follow_links=max_follow_links,
-                        timeout=timeout,
-                        allow_dynamic=allow_dynamic,
+                    extract_kwargs = _filter_supported_kwargs(
+                        extractor.extract_faqs_from_url,
+                        {
+                            "max_follow_links": max_follow_links,
+                            "timeout": timeout,
+                            "allow_dynamic": allow_dynamic,
+                        },
                     )
+                    faqs, extraction_meta = extractor.extract_faqs_from_url(url, **extract_kwargs)
             else:
                 html = extractor.fetch_url(url, timeout=timeout)
                 faqs = extractor.extract_faqs_from_html(html)
