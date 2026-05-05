@@ -206,26 +206,29 @@ def get_sql_pair_by_id(pair_id: Optional[str]) -> Dict[str, str]:
     return SQL_QUERY_PAIRS[0]
 
 
-def resolve_groq_api_key() -> str:
-    return (os.getenv("GROQ_API_KEY") or "").strip()
+def resolve_llm_api_key() -> str:
+    return (os.getenv("LLM_API_KEY") or "").strip()
 
 
-def call_groq_chat_completion(
+def call_llm_chat_completion(
     system_prompt: str,
     user_prompt: str,
     api_key: str,
     max_tokens: int = 300,
     temperature: float = 0.2,
+    messages: Optional[List[Dict[str, str]]] = None,
 ) -> Tuple[Optional[str], Optional[str]]:
     if not api_key:
-        return None, "Groq API key is required."
+        return None, "LLM API key is required."
+
+    payload_messages = messages if messages is not None else [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
 
     payload = {
         "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+        "messages": payload_messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
@@ -244,12 +247,12 @@ def call_groq_chat_completion(
         data = response.json()
         content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         if not content:
-            return None, "Groq response did not contain any summary text."
+            return None, "LLM response did not contain any summary text."
         return content.strip(), None
     except requests.exceptions.RequestException as exc:
-        return None, f"Groq API request failed: {exc}"
+        return None, f"LLM API request failed: {exc}"
     except Exception as exc:
-        return None, f"Groq response parsing failed: {exc}"
+        return None, f"LLM response parsing failed: {exc}"
 
 
 def build_sql_benchmark_llm_summary(benchmark: Dict[str, Any], api_key: str) -> Tuple[Optional[str], Optional[str]]:
@@ -265,7 +268,7 @@ def build_sql_benchmark_llm_summary(benchmark: Dict[str, Any], api_key: str) -> 
         f"Slow query text: {slow.get('query')}\n"
         f"Optimized query text: {optimized.get('query')}"
     )
-    return call_groq_chat_completion(
+    return call_llm_chat_completion(
         system_prompt="You are a SQL performance analyst. Be precise and practical.",
         user_prompt=prompt,
         api_key=api_key,
@@ -290,7 +293,7 @@ def build_faq_llm_cleanup(
         "keep clear question and answer fields only.\n\n"
         f"Input JSON:\n{sample_json}"
     )
-    content, error = call_groq_chat_completion(
+    content, error = call_llm_chat_completion(
         system_prompt="You clean FAQ datasets and return strict JSON only.",
         user_prompt=prompt,
         api_key=api_key,
@@ -300,7 +303,7 @@ def build_faq_llm_cleanup(
     if error:
         return None, error
     if not content:
-        return None, "Empty Groq cleanup response."
+        return None, "Empty LLM cleanup response."
 
     text = content.strip()
     if text.startswith("```"):
@@ -584,6 +587,59 @@ def build_faq_page_context(request: Request, **overrides: Any) -> Dict[str, Any]
     }
     context.update(overrides)
     return context
+
+
+CHATBOT_SYSTEM_PROMPT = (
+    "You are DataVista Assistant, a concise, technically strong helper for this analytics platform. "
+    "Help with FastAPI, Render deployment, SQL comparison, data pipelines, template rendering, and AI/ML project advice. "
+    "Be practical, precise, and production-oriented. If a question is outside the app context, answer directly without filler."
+)
+
+CHATBOT_WELCOME_MESSAGE = (
+    "Welcome to DataVista Chat. Ask about deployment, FastAPI patterns, SQL comparison, LLM setup, or the project architecture."
+)
+
+CHATBOT_SUGGESTIONS: List[str] = [
+    "How do I deploy this on Render?",
+    "Explain the SQL comparison workflow.",
+    "How should I handle LLM API keys?",
+    "What is the best FastAPI architecture here?",
+    "Summarize this project for interviews.",
+    "How do I keep OpenCV out of the web request path?",
+]
+
+
+def build_chatbot_page_context(request: Request, **overrides: Any) -> Dict[str, Any]:
+    context: Dict[str, Any] = {
+        "request": request,
+        "message": "Ask the LLM-powered assistant about Data Vista, deployment, backend design, or AI/ML workflows.",
+        "chatbot_title": "Vista-Bot",
+        "chatbot_subtitle": "Server-side LLM integration with no browser key exposure.",
+        "chatbot_ready": bool(resolve_llm_api_key()),
+        # mark this page as embedded so base.html can avoid rendering the floating widget inside the iframe
+        "embed": True,
+        # expose a plain string URL to the frontend to avoid serializing Starlette URL objects
+        "chatbot_api_url": str(request.url_for("api_chatbot")),
+        "chatbot_welcome": CHATBOT_WELCOME_MESSAGE,
+        "chatbot_suggestions": CHATBOT_SUGGESTIONS,
+    }
+    context.update(overrides)
+    return context
+
+
+def normalize_chat_history(history: Any, max_turns: int = 12) -> List[Dict[str, str]]:
+    if not isinstance(history, list):
+        return []
+
+    normalized: List[Dict[str, str]] = []
+    for item in history[-max_turns:]:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        content = str(item.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            normalized.append({"role": role, "content": content})
+    return normalized
 
 
 def load_data_store_class():
@@ -1246,9 +1302,44 @@ def render_error_response(request: Request, title: str, error: Any, status_code:
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    print("TYPE:", type(DATA_STORE_ERROR))
-    print("VALUE:", DATA_STORE_ERROR)
     return templates.TemplateResponse(request, "index.html", {"storage_warning": bool(DATA_STORE_ERROR)})
+
+
+@app.get("/chatbot", response_class=HTMLResponse)
+def chatbot_page(request: Request):
+    return templates.TemplateResponse("chatbot.html", build_chatbot_page_context(request))
+
+
+@app.post("/api/chatbot")
+async def api_chatbot(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Request body must be valid JSON."})
+
+    message = str((payload or {}).get("message") or "").strip()
+    if not message:
+        return JSONResponse(status_code=400, content={"error": "Message is required."})
+
+    api_key = resolve_llm_api_key()
+    if not api_key:
+        return JSONResponse(status_code=503, content={"error": "LLM_API_KEY is not configured on the server."})
+
+    chat_history = normalize_chat_history((payload or {}).get("history"))
+    chat_messages = [{"role": "system", "content": CHATBOT_SYSTEM_PROMPT}, *chat_history, {"role": "user", "content": message}]
+
+    reply, error = call_llm_chat_completion(
+        system_prompt=CHATBOT_SYSTEM_PROMPT,
+        user_prompt=message,
+        api_key=api_key,
+        max_tokens=500,
+        temperature=0.6,
+        messages=chat_messages,
+    )
+    if error:
+        return JSONResponse(status_code=502, content={"error": error})
+
+    return JSONResponse(content={"reply": reply})
 
 @app.get("/parameters", response_class=HTMLResponse)
 def parameters_reference(request: Request):
@@ -2193,9 +2284,10 @@ async def sql(
         report_html = None
 
         textareas_query_mode = _looks_like_query(db1_text) and _looks_like_query(db2_text)
+        benchmark_schema_sql = SQL_EXAMPLE_SCHEMA if textareas_query_mode and not has_file_input else db1_text
         if textareas_query_mode and not has_file_input:
             comparison_message = (
-                "Using DB1/DB2 textareas as query inputs. "
+                "Using DB1/DB2 textareas as query inputs against the built-in sample tables. "
                 "Schema comparison step was skipped for this run."
             )
         else:
@@ -2219,7 +2311,7 @@ async def sql(
                 comparison_error = f"Error running comparison: {details}"
 
         benchmark = benchmark_query_pair(
-            schema_sql=db1_text,
+            schema_sql=benchmark_schema_sql,
             slow_query=query_slow_input,
             optimized_query=query_optimized_input,
             warmup_runs=warmup_runs,
@@ -2229,9 +2321,9 @@ async def sql(
         llm_insight = None
         llm_error = None
         if should_use_llm:
-            api_key = resolve_groq_api_key()
+            api_key = resolve_llm_api_key()
             if not api_key:
-                llm_error = "Groq API key is required when LLM summary is enabled. Set GROQ_API_KEY in server environment variables."
+                llm_error = "LLM API key is required when LLM summary is enabled. Set LLM_API_KEY in server environment variables."
             else:
                 llm_insight, llm_error = build_sql_benchmark_llm_summary(benchmark, api_key)
 
@@ -2352,9 +2444,9 @@ async def faq(request: Request):
 
             llm_error = None
             if use_llm_cleanup and faqs:
-                api_key = resolve_groq_api_key()
+                api_key = resolve_llm_api_key()
                 if not api_key:
-                    llm_error = "Groq API key is required when LLM cleanup is enabled. Set GROQ_API_KEY in server environment variables."
+                    llm_error = "LLM API key is required when LLM cleanup is enabled. Set LLM_API_KEY in server environment variables."
                 else:
                     sample_size = min(12, len(faqs))
                     cleaned_sample, llm_error = build_faq_llm_cleanup(faqs[:sample_size], api_key, max_items=sample_size)

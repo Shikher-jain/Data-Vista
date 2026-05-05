@@ -79,7 +79,10 @@ Create `.env` in the repository root:
 
 ```env
 WEATHER_API_KEY=your_openweather_api_key
+LLM_API_KEY=your_llm_api_key
 ```
+
+`LLM_API_KEY` is used by the SQL Comparison LLM summary, FAQ cleanup flows, and the LLM chatbot endpoint.
 
 ## Run Locally
 
