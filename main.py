@@ -70,6 +70,7 @@ house_model = None
 faq_extractor_module = None
 laptop_pipe = None
 laptop_df = None
+attendance_process = None
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -849,9 +850,24 @@ def _filter_supported_kwargs(func: Any, kwargs: Dict[str, Any]) -> Dict[str, Any
 def load_student_records():
     try:
         records = DATA_STORE.list_students()
-        data = {row["name"]: row["grade"] for row in records}
-        items = sorted(({"name": k, "grade": v} for k, v in data.items()), key=lambda x: x["name"].lower())
-        return data, items, None
+        items = []
+        for row in records:
+            name = row["name"]
+            grade = float(row["grade"])
+            range_upper = float(row.get("range_upper") or 10.0)
+            if range_upper <= 0:
+                range_upper = 10.0
+            items.append(
+                {
+                    "name": name,
+                    "grade": grade,
+                    "range_upper": range_upper,
+                    "marks": f"{grade:g}/{range_upper:g}",
+                    "decimal_result": f"{grade / range_upper:g}",
+                }
+            )
+        items.sort(key=lambda x: x["name"].lower())
+        return {row["name"]: row["grade"] for row in records}, items, None
     except Exception as exc:
         return {}, [], f"Could not read student records: {exc}"
 
@@ -912,7 +928,7 @@ def resolve_grade_range(form_data) -> Tuple[float, float, str]:
     presets = {
         "1-5": (1.0, 5.0),
         "1-10": (1.0, 10.0),
-        "1-120": (1.0, 120.0),
+        "1-100": (1.0, 100.0),
     }
 
     if selected_range in presets:
@@ -920,11 +936,11 @@ def resolve_grade_range(form_data) -> Tuple[float, float, str]:
         return lower, upper, selected_range
 
     if selected_range.lower() == "custom":
-        lower = parse_float(form_data, "custom_min", "Custom minimum grade")
-        upper = parse_float(form_data, "custom_max", "Custom maximum grade")
-        if lower >= upper:
-            raise ValueError("Custom maximum grade must be greater than custom minimum grade.")
-        return lower, upper, f"{lower:g}-{upper:g}"
+        upper = parse_float(form_data, "custom_max", "Custom maximum grade", min_value=1)
+        lower = 1.0
+        if upper < lower:
+            raise ValueError("Custom maximum grade must be at least 1.")
+        return lower, upper, f"1-{upper:g}"
 
     raise ValueError("Please choose a valid grade range option.")
 
@@ -1774,11 +1790,34 @@ async def census(request: Request):
 
 @app.get("/attendance", response_class=HTMLResponse)
 def attendance(request: Request):
+    attendance_dir = BASE_DIR / "StudentAttendance"
+    script_path = attendance_dir / "mark_attendance.py"
+
+    def launch_attendance_gui() -> str:
+        global attendance_process
+
+        if not script_path.exists():
+            raise FileNotFoundError(f"Missing attendance script: {script_path}")
+
+        if attendance_process is not None and attendance_process.poll() is None:
+            return "Attendance GUI is already running."
+
+        attendance_process = subprocess.Popen(
+            [sys.executable, str(script_path)],
+            cwd=str(attendance_dir),
+        )
+        return "Attendance GUI launched. The local window should now be open on this machine."
+
+    try:
+        launch_message = launch_attendance_gui()
+    except Exception as exc:
+        launch_message = f"Could not launch attendance GUI: {exc}"
+
     msg = (
-        "Use the StudentAttendance module (register, train, then mark_attendance) from the StudentAttendance folder. "
-        "This page provides the Streamlit link and local-camera preview only."
+        "This page launches the local face-recognition attendance window from StudentAttendance/mark_attendance.py. "
+        "Register and train first if the model files are missing."
     )
-    return templates.TemplateResponse("attendance.html", {"request": request, "message": msg})
+    return templates.TemplateResponse("attendance.html", {"request": request, "message": msg, "launch_message": launch_message})
 
 
 @app.api_route("/students", methods=["GET", "POST"], response_class=HTMLResponse)
@@ -1786,7 +1825,6 @@ async def student_management(request: Request):
     _, records, error = load_student_records()
     message = None
     grade_range = "1-10"
-    custom_min = ""
     custom_max = ""
     name_input = ""
     grade_input = ""
@@ -1795,7 +1833,6 @@ async def student_management(request: Request):
         form = await request.form()
         action = (form.get("action") or "").strip().lower()
         grade_range = (form.get("grade_range") or "1-10").strip()
-        custom_min = (form.get("custom_min") or "").strip()
         custom_max = (form.get("custom_max") or "").strip()
         name_input = (form.get("name") or "").strip()
         grade_input = (form.get("grade") or "").strip()
@@ -1808,7 +1845,7 @@ async def student_management(request: Request):
                 try:
                     min_grade, max_grade, range_label = resolve_grade_range(form)
                     grade = parse_float(form, "grade", "Grade", min_value=min_grade, max_value=max_grade)
-                    DATA_STORE.upsert_student(name, grade)
+                    DATA_STORE.upsert_student(name, grade, max_grade)
                     message = f"Saved {name}. Grade range used: {range_label}."
                 except ValueError as exc:
                     message = str(exc)
@@ -1838,7 +1875,6 @@ async def student_management(request: Request):
             "error": error,
             "message": message,
             "grade_range": grade_range,
-            "custom_min": custom_min,
             "custom_max": custom_max,
             "name_input": name_input,
             "grade_input": grade_input,
