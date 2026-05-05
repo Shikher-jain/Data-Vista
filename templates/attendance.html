@@ -12,13 +12,34 @@
         {% endif %}
 
         <div class="card p-3 mb-3">
-            <h5 class="mb-2">Launch Local GUI</h5>
-            <p class="mb-3">This opens the Python face-recognition window from StudentAttendance/mark_attendance.py on the same machine that is running the FastAPI server.</p>
-            <p class="mb-0"><strong>Prerequisite:</strong> register and train the face model first if you have not already.</p>
+            <h5 class="mb-2">Register Face</h5>
+            <p class="mb-3">Runs StudentAttendance/register.py and captures face images for a student.</p>
+            <form method="post" class="row g-2 align-items-end">
+                <div class="col-md-8">
+                    <label for="student_name" class="form-label">Student Name</label>
+                    <input type="text" class="form-control" id="student_name" name="student_name" placeholder="Enter the student name">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" name="action" value="register" class="btn btn-primary w-100">Register</button>
+                </div>
+            </form>
         </div>
 
-        <form method="post" class="d-inline">
-            <button type="submit" class="btn btn-success mb-3">Open Attendance GUI</button>
-        </form>
+        <div class="card p-3 mb-3">
+            <h5 class="mb-2">Train Model</h5>
+            <p class="mb-3">Runs StudentAttendance/train.py to build the face model from the captured images.</p>
+            <form method="post" class="d-inline">
+                <button type="submit" name="action" value="train" class="btn btn-warning mb-0">Train</button>
+            </form>
+        </div>
+
+        <div class="card p-3 mb-3">
+            <h5 class="mb-2">Mark Attendance</h5>
+            <p class="mb-3">Runs StudentAttendance/mark_attendance.py to open the live attendance window.</p>
+            <p class="mb-0"><strong>Prerequisite:</strong> register and train the face model first if you have not already.</p>
+            <form method="post" class="d-inline mt-3">
+                <button type="submit" name="action" value="mark" class="btn btn-success mb-0">Mark Attendance</button>
+            </form>
+        </div>
     </div>
 {% endblock %}

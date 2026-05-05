@@ -18,6 +18,17 @@
     <div class="alert alert-warning">{{ llm_error }}</div>
     {% endif %}
 
+    {% if warnings %}
+    <div class="alert alert-warning">
+        <strong>Warnings:</strong>
+        <ul class="mb-0 mt-2">
+            {% for warning in warnings %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
     <form method="POST" class="mb-4">
         <div class="mb-3">
             <label for="url" class="form-label">Website URL</label>
