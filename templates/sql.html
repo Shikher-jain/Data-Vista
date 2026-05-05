@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container mt-4">
     <h1>SQL Comparison</h1>
-    <p class="text-muted">Compare schema, run paired queries (slow vs optimized), and get a speed report.</p>
+    <p class="text-muted">Compare schema, indexes, constraints, run paired queries (slow vs optimized), and review the query plans behind the speed report.</p>
 
     <form method="POST" enctype="multipart/form-data" class="mb-4">
         <div class="row g-3 mb-3">
@@ -126,7 +126,15 @@
                             <li>P95: {{ benchmark.slow.p95_ms }} ms</li>
                             <li>Min/Max: {{ benchmark.slow.min_ms }} / {{ benchmark.slow.max_ms }} ms</li>
                             <li>Rows Returned: {{ benchmark.slow.row_count }}</li>
+                            <li>Affected Rows: {{ benchmark.slow.affected_rows }}</li>
+                            <li>Runs: {{ benchmark.slow.runs }}</li>
                         </ul>
+                        {% if benchmark.slow.explain %}
+                        <details class="mt-3">
+                            <summary class="fw-semibold">Query Plan</summary>
+                            <pre class="mt-2 mb-0 bg-light border rounded p-2" style="white-space: pre-wrap;">{{ benchmark.slow.explain | join('\n') }}</pre>
+                        </details>
+                        {% endif %}
                         {% endif %}
                     </div>
                 </div>
@@ -142,7 +150,15 @@
                             <li>P95: {{ benchmark.optimized.p95_ms }} ms</li>
                             <li>Min/Max: {{ benchmark.optimized.min_ms }} / {{ benchmark.optimized.max_ms }} ms</li>
                             <li>Rows Returned: {{ benchmark.optimized.row_count }}</li>
+                            <li>Affected Rows: {{ benchmark.optimized.affected_rows }}</li>
+                            <li>Runs: {{ benchmark.optimized.runs }}</li>
                         </ul>
+                        {% if benchmark.optimized.explain %}
+                        <details class="mt-3">
+                            <summary class="fw-semibold">Query Plan</summary>
+                            <pre class="mt-2 mb-0 bg-light border rounded p-2" style="white-space: pre-wrap;">{{ benchmark.optimized.explain | join('\n') }}</pre>
+                        </details>
+                        {% endif %}
                         {% endif %}
                     </div>
                 </div>
