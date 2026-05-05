@@ -1,9 +1,11 @@
 import cv2
 import os
+from pathlib import Path
 
 # Load Haar Cascade
 # face_classifier = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-face_classifier = cv2.CascadeClassifier(os.path.abspath('haarcascade_frontalface_default.xml'))
+BASE_DIR = Path(__file__).resolve().parent
+face_classifier = cv2.CascadeClassifier(str(BASE_DIR / 'haarcascade_frontalface_default.xml'))
 if face_classifier.empty():
     print("Error: Haarcascade XML file not loaded properly.")
     exit()
@@ -11,7 +13,7 @@ if face_classifier.empty():
 def capture_face(name):
     cam = cv2.VideoCapture(0)
     count = 0
-    path = 'student_images/' + name
+    path = BASE_DIR / 'student_images' / name
     os.makedirs(path, exist_ok=True)
 
 
@@ -31,7 +33,7 @@ def capture_face(name):
         for (x, y, w, h) in faces:
             count += 1
             face = cv2.resize(gray[y:y+h, x:x+w], (200, 200))
-            cv2.imwrite(f"{path}/{count}.jpg", face)
+            cv2.imwrite(str(path / f"{count}.jpg"), face)
 
             cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)  # Green rectangle for face
             cv2.putText(frame, f"Images Captured: {count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
