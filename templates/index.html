@@ -31,7 +31,9 @@
         </div>
     </div>
 
-    <div class="container mt-5">
+
+
+    <!-- <div class="container mt-5">
         {% if storage_warning %}
         <div class="alert alert-warning">
             Persistent storage initialization failed. Some features may be temporarily unavailable.
@@ -39,6 +41,7 @@
         {% endif %}
         
         <div class="row">
+
             <div class="col-md-4">
                 <div class="card-container">
                     <h3>Laptop Price Predictor</h3>
@@ -46,6 +49,7 @@
                     <a href="/laptop" class="btn btn-primary">Go</a>
                 </div>
             </div>
+            
             <div class="col-md-4">
                 <div class="card-container">
                     <h3>Diabetes Prediction</h3>
@@ -53,6 +57,7 @@
                     <a href="/diabetes" class="btn btn-primary">Go</a>
                 </div>
             </div>
+            
             <div class="col-md-4">
                 <div class="card-container">
                     <h3>GDP Dashboard</h3>
@@ -60,16 +65,9 @@
                     <a href="/gdp" class="btn btn-primary">Go</a>
                 </div>
             </div>
+
         </div>
-        <div class="row mt-3">
-            <div class="col-md-4">
-                <div class="card-container">
-                    <h3>IPL App</h3>
-                    <p>IPL statistics and analysis.</p>
-                    <a href="/ipl" class="btn btn-primary">Go</a>
-                </div>
-            </div>
-        </div>
+
 
         <div class="row mt-3">
             <div class="col-md-4">
@@ -146,6 +144,152 @@
                 </div>
             </div>
         </div>
+
+    </div>
+        <div class="row mt-3">
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h3>IPL App</h3>
+                    <p>IPL statistics and analysis.</p>
+                    <a href="/ipl" class="btn btn-primary">Go</a>
+                </div>
+            </div>
+
+        </div> -->
+
+
+<!--  -->
+
+    <div class="container mt-5">
+
+        {% if storage_warning %}
+        <div class="alert alert-warning">
+            Persistent storage initialization failed. Some features may be temporarily unavailable.
+        </div>
+        {% endif %}
+
+        <!-- AI / ML SYSTEMS -->
+        <h2 class="mb-3">🤖 AI / Machine Learning Systems</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>Laptop Price Predictor</h4>
+                    <p>ML model predicting laptop prices.</p>
+                    <a href="/laptop" class="btn btn-success">Try Model</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>House Price Prediction</h4>
+                    <p>Regression-based housing prediction.</p>
+                    <a href="/house" class="btn btn-success">Try Model</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>Diabetes Prediction</h4>
+                    <p>Medical ML classification system.</p>
+                    <a href="/diabetes" class="btn btn-success">Try Model</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- COMPUTER VISION -->
+        <h2 class="mt-5 mb-3">🧠 Computer Vision</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>Attendance System</h4>
+                    <p>Face recognition-based attendance.</p>
+                    <a href="/attendance" class="btn btn-warning">Launch CV App</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- NLP SYSTEMS -->
+        <h2 class="mt-5 mb-3">📄 NLP Systems</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>FAQ Extractor</h4>
+                    <p>Extract FAQs using NLP pipeline.</p>
+                    <a href="/faq" class="btn btn-info">Run NLP</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>Skill Advisory</h4>
+                    <p>Resume → Skill recommendations.</p>
+                    <a href="/skill" class="btn btn-info">Analyze Resume</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- DATA ANALYTICS -->
+        <h2 class="mt-5 mb-3">📊 Data Analytics</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>GDP Dashboard</h4>
+                    <p>Country GDP visual insights.</p>
+                    <a href="/gdp" class="btn btn-primary">View Dashboard</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>IPL Analytics</h4>
+                    <p>Cricket data analysis system.</p>
+                    <a href="/ipl" class="btn btn-primary">Explore Data</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>India Census</h4>
+                    <p>Population insights & trends.</p>
+                    <a href="/census" class="btn btn-primary">Analyze</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- UTILITIES -->
+        <h2 class="mt-5 mb-3">⚙️ Utilities & Tools</h2>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>Weather App</h4>
+                    <p>Real-time weather API system.</p>
+                    <a href="/weather" class="btn btn-secondary">Check Weather</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>SQL Comparison</h4>
+                    <p>Compare DB schemas intelligently.</p>
+                    <a href="/sql" class="btn btn-secondary">Compare DB</a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card-container">
+                    <h4>Student Management</h4>
+                    <p>Manage student data via GUI.</p>
+                    <a href="/students" class="btn btn-secondary">Open System</a>
+                </div>
+            </div>
+        </div>
+
     </div>
 
+<!--  -->
 {% endblock %}
+
+
+
+
