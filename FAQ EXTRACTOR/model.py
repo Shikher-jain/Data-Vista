@@ -2,8 +2,20 @@ import streamlit as st
 from sentence_transformers import SentenceTransformer, util
 import json
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 import re
+from dotenv import load_dotenv
+from huggingface_hub.utils import logging as hf_hub_logging
+from transformers.utils import logging as hf_transformers_logging
+
+load_dotenv()
+
+hf_hub_logging.set_verbosity_error()
+hf_transformers_logging.set_verbosity_error()
+
+MODEL_CACHE_DIR = Path.home() / ".cache" / "data-vista" / "faq-extractor"
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 st.set_page_config(page_title="FAQ Retrieval System", layout="wide")
 
@@ -12,7 +24,11 @@ st.set_page_config(page_title="FAQ Retrieval System", layout="wide")
 @st.cache_resource
 def load_model():
     # This model is pre-trained to understand the semantic meaning of sentences.
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    model_kwargs = {"cache_folder": str(MODEL_CACHE_DIR)}
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_HUB_TOKEN")
+    if hf_token:
+        model_kwargs["token"] = hf_token
+    return SentenceTransformer(MODEL_NAME, **model_kwargs)
 
 model = load_model()
 

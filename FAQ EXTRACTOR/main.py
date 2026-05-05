@@ -8,7 +8,7 @@ def run_command(cmd):
         exit(1)
 
 if __name__ == "__main__":
-    run_command("python app.py")
+    run_command("python app.py --cli")
 
     if "y" == input("Do you want to run the Streamlit app to ask questions? (y/n): ").strip().lower():
         run_command("streamlit run model.py")

@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FAQ Extractor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #08111d;
+      --bg-2: #0e1b2f;
+      --panel: rgba(13, 24, 41, 0.82);
+      --panel-border: rgba(255, 255, 255, 0.09);
+      --text: #edf3ff;
+      --muted: #a9b7ce;
+      --accent: #66d9ff;
+      --accent-2: #8b7cff;
+      --good: #56d39b;
+      --warn: #ffd166;
+      --bad: #ff7f9f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(102, 217, 255, 0.24), transparent 30%),
+        radial-gradient(circle at right 20%, rgba(139, 124, 255, 0.20), transparent 24%),
+        linear-gradient(135deg, var(--bg), var(--bg-2));
+    }
+
+    .page-shell {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .orb {
+      position: fixed;
+      inset: auto;
+      border-radius: 999px;
+      filter: blur(20px);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .orb.one {
+      width: 240px;
+      height: 240px;
+      top: -60px;
+      left: -40px;
+      background: rgba(102, 217, 255, 0.22);
+    }
+
+    .orb.two {
+      width: 320px;
+      height: 320px;
+      right: -120px;
+      top: 180px;
+      background: rgba(139, 124, 255, 0.18);
+    }
+
+    .orb.three {
+      width: 180px;
+      height: 180px;
+      bottom: 40px;
+      left: 18%;
+      background: rgba(86, 211, 155, 0.14);
+    }
+
+    .hero {
+      position: relative;
+      padding: 2.2rem 0 1rem;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+      margin-bottom: 1rem;
+    }
+
+    h1, h2, h3, h4, h5, h6, .brand {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 4vw, 4.4rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      max-width: 11ch;
+      margin-bottom: 1rem;
+    }
+
+    .hero p {
+      max-width: 62rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-bottom: 0;
+    }
+
+    .glass {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      box-shadow: 0 20px 70px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(14px);
+    }
+
+    .form-card {
+      padding: 1.4rem;
+    }
+
+    .form-label {
+      color: #dfe7f4;
+      font-weight: 600;
+    }
+
+    .form-control {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 0.8rem 1rem;
+    }
+
+    .form-control:focus {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border-color: rgba(102, 217, 255, 0.65);
+      box-shadow: 0 0 0 0.2rem rgba(102, 217, 255, 0.12);
+    }
+
+    .form-control::placeholder {
+      color: #7e8aa5;
+    }
+
+    .btn-accent {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: 0;
+      color: #05111c;
+      font-weight: 700;
+      border-radius: 14px;
+      padding: 0.9rem 1.2rem;
+    }
+
+    .btn-accent:hover {
+      color: #05111c;
+      filter: brightness(1.03);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .stat {
+      padding: 1rem 1.1rem;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .stat .label {
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.3rem;
+    }
+
+    .stat .value {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .section-title {
+      margin-bottom: 0.9rem;
+      font-size: 1.2rem;
+    }
+
+    .subtle {
+      color: var(--muted);
+    }
+
+    .url-list {
+      max-height: 380px;
+      overflow: auto;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.38rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      font-size: 0.86rem;
+    }
+
+    .pill.good { color: #d8ffee; border-color: rgba(86, 211, 155, 0.4); }
+    .pill.warn { color: #fff3c4; border-color: rgba(255, 209, 102, 0.4); }
+    .pill.bad { color: #ffe0ea; border-color: rgba(255, 127, 159, 0.4); }
+
+    .result-card {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 18px;
+      padding: 1rem 1.1rem;
+      height: 100%;
+    }
+
+    .faq-answer {
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .table-darkish {
+      --bs-table-bg: transparent;
+      --bs-table-color: var(--text);
+      --bs-table-striped-color: var(--text);
+      --bs-table-striped-bg: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .footer-note {
+      color: #7f8ca6;
+      font-size: 0.92rem;
+    }
+
+    .alert {
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+    }
+
+    @media (max-width: 991px) {
+      .stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 576px) {
+      .hero h1 {
+        max-width: 100%;
+      }
+
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body class="page-shell">
+  <div class="orb one"></div>
+  <div class="orb two"></div>
+  <div class="orb three"></div>
+
+  <main class="container py-4 py-lg-5">
+    <section class="hero mb-4 mb-lg-5">
+      <div class="eyebrow">FAQ Extractor</div>
+      <h1>Extract FAQs from a website without changing the crawler logic.</h1>
+      <p>
+        Enter a site URL, choose crawl depth and worker count, then let the existing extractor scan the pages,
+        deduplicate questions, and save the output to a JSONL file in the QnA folder.
+      </p>
+    </section>
+
+    {% if message %}
+    <div class="alert alert-success glass text-light mb-4">{{ message }}</div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger glass text-light mb-4">{{ error }}</div>
+    {% endif %}
+
+    {% if warnings %}
+    <div class="alert alert-warning glass text-light mb-4">
+      <strong>Warnings:</strong>
+      <ul class="mb-0 mt-2">
+        {% for warning in warnings %}
+        <li>{{ warning }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <section class="glass form-card mb-4">
+      <form method="post">
+        <div class="row g-3">
+          <div class="col-lg-12">
+            <label for="url" class="form-label">Website URL</label>
+            <input type="url" class="form-control" id="url" name="url" value="{{ url_input or '' }}" placeholder="https://example.com/faq" required>
+            <div class="form-text text-secondary">Supports static pages and many FAQ-style pages with structured markup.</div>
+          </div>
+
+          <div class="col-md-3 col-sm-6">
+            <label for="crawl_depth" class="form-label">Crawl Depth</label>
+            <input type="number" class="form-control" id="crawl_depth" name="crawl_depth" min="0" max="5" value="{{ crawl_depth }}">
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label for="max_workers" class="form-label">Max Workers</label>
+            <input type="number" class="form-control" id="max_workers" name="max_workers" min="1" max="20" value="{{ max_workers }}">
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label for="timeout" class="form-label">Timeout (seconds)</label>
+            <input type="number" class="form-control" id="timeout" name="timeout" min="5" max="90" value="{{ timeout }}">
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label for="min_answer_len" class="form-label">Min Answer Length</label>
+            <input type="number" class="form-control" id="min_answer_len" name="min_answer_len" min="0" max="3000" value="{{ min_answer_len }}">
+          </div>
+
+          <div class="col-12 d-flex flex-wrap gap-2 align-items-center mt-2">
+            <button type="submit" class="btn btn-accent">Extract FAQs</button>
+            {% if qna_file %}
+            <a class="btn btn-outline-light rounded-pill" href="{{ url_for('download_qna', filename=qna_name) }}">Download JSONL</a>
+            {% endif %}
+            <span class="footer-note">Output is saved in <strong>QnA/</strong> as a JSONL file.</span>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="stat-grid mb-4">
+      <div class="stat glass">
+        <div class="label">Site</div>
+        <div class="value">{{ site_name or '—' }}</div>
+      </div>
+      <div class="stat glass">
+        <div class="label">Pages Crawled</div>
+        <div class="value">{{ page_count or 0 }}</div>
+      </div>
+      <div class="stat glass">
+        <div class="label">FAQs Extracted</div>
+        <div class="value">{{ faq_count or 0 }}</div>
+      </div>
+      <div class="stat glass">
+        <div class="label">Time</div>
+          <div class="value">{% if duration is not none %}{{ duration }}s{% else %}—{% endif %}</div>
+      </div>
+    </section>
+
+    {% if qna_file %}
+    <section class="glass p-3 p-lg-4 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h2 class="section-title mb-0">Saved File</h2>
+        <span class="pill {% if cached %}good{% else %}warn{% endif %}">{% if cached %}Cache hit{% else %}Fresh extraction{% endif %}</span>
+      </div>
+      <div class="subtle">{{ qna_file }}</div>
+    </section>
+    {% endif %}
+
+    {% if pages %}
+    <section class="glass p-3 p-lg-4 mb-4">
+      <h2 class="section-title">Crawled Pages</h2>
+      <div class="table-responsive url-list">
+        <table class="table table-darkish table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>URL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in pages %}
+            <tr>
+              <td class="text-break">{{ item.url }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if faqs %}
+    <section class="mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+        <div>
+          <h2 class="section-title mb-1">Extracted FAQs</h2>
+          <div class="subtle">Showing the first {{ faqs|length }} FAQs from the current extraction.</div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        {% for faq in faqs %}
+        <div class="col-lg-6">
+          <article class="result-card glass">
+            <div class="pill mb-3">FAQ {{ loop.index }}</div>
+            <h3 class="h5 mb-3 text-break">{{ faq.get('question', '') }}</h3>
+            <div class="faq-answer">{{ faq.get('answer', '') }}</div>
+          </article>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if not faqs and not error and qna_file %}
+    <section class="glass p-3 p-lg-4 mb-4">
+      <h2 class="section-title">No FAQs Displayed</h2>
+      <p class="subtle mb-0">The extractor completed, but no FAQ pairs passed the current minimum answer length filter.</p>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
