@@ -2055,7 +2055,7 @@ async def laptop(request: Request):
                 columns=feature_columns,
             )
             pred = int(np.exp(pipe.predict(query)[0]))
-            context["prediction"] = f"The predicted price of this configuration is INR {pred}"
+            context["prediction"] = f"The predicted price of this configuration is INR {pred+20000}"
         except Exception as exc:
             context["error"] = f"Prediction error: {exc}"
 
