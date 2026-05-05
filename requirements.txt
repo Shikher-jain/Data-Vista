@@ -15,7 +15,7 @@ shap
 plotly
 sentence-transformers
 streamlit
-opencv-python-headless  # Replaced opencv-python with headless version to reduce size
+opencv-contrib-python  # Needed for StudentAttendance LBPHFaceRecognizer_create and GUI attendance windows
 requests
 beautifulsoup4
 lxml
