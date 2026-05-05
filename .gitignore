@@ -16,3 +16,11 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints
+
+# Project artifacts
+FAQ EXTRACTOR/*.jsonl
+FAQ EXTRACTOR/QnA/*.jsonl
+StudentAttendance/attendance.csv
+StudentAttendance/face_model.yml
+StudentAttendance/labels.pkl
+StudentAttendance/student_images/
