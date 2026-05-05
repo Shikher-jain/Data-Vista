@@ -18,6 +18,9 @@ Thumbs.db
 .ipynb_checkpoints
 
 # Project artifacts
+*.png
+*.jpg
+*.jpeg
 FAQ EXTRACTOR/*.jsonl
 FAQ EXTRACTOR/QnA/*.jsonl
 StudentAttendance/attendance.csv
