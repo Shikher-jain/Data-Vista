@@ -1,4 +1,5 @@
 import os
+import asyncio
 import json
 import inspect
 from pathlib import Path
@@ -567,6 +568,11 @@ def build_faq_page_context(request: Request, **overrides: Any) -> Dict[str, Any]
         "cache_file": None,
         "cache_hit": False,
         "pages": [],
+        "faqs": [],
+        "page_count": 0,
+        "faq_count": 0,
+        "duration": None,
+        "warnings": [],
         "llm_error": None,
     }
     context.update(overrides)
@@ -582,7 +588,6 @@ def load_data_store_class():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # type: ignore[attr-defined]
     return module.DataVistaStore
-
 
 DataVistaStore = load_data_store_class()
 
@@ -1788,12 +1793,14 @@ async def census(request: Request):
     )
 
 
-@app.get("/attendance", response_class=HTMLResponse)
-def attendance(request: Request):
+@app.api_route("/attendance", methods=["GET", "POST"], response_class=HTMLResponse)
+async def attendance(request: Request):
     attendance_dir = BASE_DIR / "StudentAttendance"
-    script_path = attendance_dir / "mark_attendance.py"
+    register_script = attendance_dir / "register.py"
+    train_script = attendance_dir / "train.py"
+    mark_script = attendance_dir / "mark_attendance.py"
 
-    def launch_attendance_gui() -> str:
+    def launch_attendance_gui(script_path: Path, *script_args: str) -> str:
         global attendance_process
 
         if not script_path.exists():
@@ -1803,19 +1810,51 @@ def attendance(request: Request):
             return "Attendance GUI is already running."
 
         attendance_process = subprocess.Popen(
-            [sys.executable, str(script_path)],
+            [sys.executable, str(script_path), *script_args],
             cwd=str(attendance_dir),
         )
-        return "Attendance GUI launched. The local window should now be open on this machine."
+        return f"{script_path.stem.replace('_', ' ').title()} launched. The local window should now be open on this machine."
 
-    try:
-        launch_message = launch_attendance_gui()
-    except Exception as exc:
-        launch_message = f"Could not launch attendance GUI: {exc}"
+    async def run_training_script() -> str:
+        if not train_script.exists():
+            raise FileNotFoundError(f"Missing attendance script: {train_script}")
+
+        completed = await asyncio.to_thread(
+            subprocess.run,
+            [sys.executable, str(train_script)],
+            cwd=str(attendance_dir),
+            capture_output=True,
+            text=True,
+        )
+        output = (completed.stdout or "").strip()
+        error_output = (completed.stderr or "").strip()
+        if completed.returncode != 0:
+            raise RuntimeError(error_output or output or "Training failed without a message.")
+        return output or "Training completed successfully."
+
+    launch_message = None
+    if request.method == "POST":
+        form = await request.form()
+        action = str(form.get("action") or "mark").strip().lower()
+        student_name = str(form.get("student_name") or "").strip()
+
+        try:
+            if action == "register":
+                if not student_name:
+                    raise ValueError("Enter a student name before starting registration.")
+                launch_message = launch_attendance_gui(register_script, student_name)
+            elif action == "train":
+                launch_message = await run_training_script()
+            elif action == "mark":
+                launch_message = launch_attendance_gui(mark_script)
+            else:
+                raise ValueError("Unknown attendance action.")
+        except Exception as exc:
+            launch_message = f"Could not complete the requested attendance action: {exc}"
 
     msg = (
-        "This page launches the local face-recognition attendance window from StudentAttendance/mark_attendance.py. "
-        "Register and train first if the model files are missing."
+        "Use the buttons below to run StudentAttendance/register.py, StudentAttendance/train.py, or StudentAttendance/mark_attendance.py. "
+        "Register first, then train, then mark attendance."
     )
     return templates.TemplateResponse("attendance.html", {"request": request, "message": msg, "launch_message": launch_message})
 
@@ -2255,88 +2294,33 @@ async def faq(request: Request):
             if err:
                 return templates.TemplateResponse("faq.html", {**base_context, "error": err})
 
-            cache_file = None
-            if hasattr(extractor, "get_qna_jsonl_path"):
-                try:
-                    cache_file = extractor.get_qna_jsonl_path(url)
-                except Exception:
-                    cache_file = None
-
-            if reuse_cache and hasattr(extractor, "load_cached_faqs_for_url"):
-                cached_faqs = extractor.load_cached_faqs_for_url(url)
-                if cached_faqs:
-                    cached_faqs = [
-                        faq
-                        for faq in cached_faqs
-                        if len(str(faq.get("answer", "")).strip()) >= min_answer_len
-                    ]
-
-                    llm_error = None
-                    if use_llm_cleanup and cached_faqs:
-                        api_key = resolve_groq_api_key()
-                        if not api_key:
-                            llm_error = "Groq API key is required when LLM cleanup is enabled. Set GROQ_API_KEY in server environment variables."
-                        else:
-                            sample_size = min(12, len(cached_faqs))
-                            cleaned_sample, llm_error = build_faq_llm_cleanup(cached_faqs[:sample_size], api_key, max_items=sample_size)
-                            if cleaned_sample:
-                                cached_faqs = cleaned_sample + cached_faqs[sample_size:]
-
-                    return templates.TemplateResponse(
-                        "faq.html",
-                        {
-                            **base_context,
-                            "message": f"Loaded {len(cached_faqs)} FAQs from cached JSONL for this URL.",
-                            "faqs": cached_faqs[:30],
-                            "cache_file": cache_file,
-                            "cache_hit": True,
-                            "llm_error": llm_error,
-                        },
-                    )
-
-            extraction_meta = {}
-            crawled_urls: List[str] = []
-
-            if crawl_depth > 0 and hasattr(extractor, "crawl_site"):
-                crawl_kwargs = _filter_supported_kwargs(
-                    extractor.crawl_site,
-                    {
-                        "max_depth": crawl_depth,
-                        "max_workers": max_workers,
-                        "timeout": timeout,
-                        "allow_dynamic": allow_dynamic,
-                        "max_pages": max_follow_links,
-                    },
+            if not hasattr(extractor, "run_extraction"):
+                return templates.TemplateResponse(
+                    "faq.html",
+                    {**base_context, "error": "Loaded FAQ extractor module does not expose run_extraction()."},
                 )
-                crawled_urls, faqs = extractor.crawl_site(url, **crawl_kwargs)
-                extraction_meta = {
-                    "attempts": [],
-                    "warnings": [],
-                    "pages": [{"url": page, "faqs": "n/a"} for page in crawled_urls],
-                }
-            if hasattr(extractor, "extract_faqs_from_url"):
-                if not crawled_urls:
-                    extract_kwargs = _filter_supported_kwargs(
-                        extractor.extract_faqs_from_url,
-                        {
-                            "max_follow_links": max_follow_links,
-                            "timeout": timeout,
-                            "allow_dynamic": allow_dynamic,
-                        },
-                    )
-                    faqs, extraction_meta = extractor.extract_faqs_from_url(url, **extract_kwargs)
-            else:
-                html = extractor.fetch_url(url, timeout=timeout)
-                faqs = extractor.extract_faqs_from_html(html)
 
-            if hasattr(extractor, "deduplicate_faqs"):
-                faqs = extractor.deduplicate_faqs(faqs)
+            result = extractor.run_extraction(
+                url,
+                crawl_depth,
+                max_workers,
+                timeout=timeout,
+                min_answer_len=min_answer_len,
+                reuse_cache=reuse_cache,
+                max_pages=max_follow_links,
+                allow_dynamic=allow_dynamic,
+            )
 
             faqs = [
                 faq
-                for faq in faqs
+                for faq in result.get("faqs", [])
                 if len(str(faq.get("answer", "")).strip()) >= min_answer_len
             ]
+            pages = [{"url": page_url, "faqs": "n/a"} for page_url in result.get("urls", [])]
+            cache_file = str(result.get("qna_file")) if result.get("qna_file") else None
+            cache_hit = bool(result.get("cached"))
+            fetch_attempts = result.get("fetch_attempts", [])
+            warning_msgs = [msg for msg in result.get("warnings", []) if str(msg).strip()]
 
             llm_error = None
             if use_llm_cleanup and faqs:
@@ -2350,37 +2334,35 @@ async def faq(request: Request):
                         faqs = cleaned_sample + faqs[sample_size:]
 
             if not faqs:
-                warning_msgs = []
-                for item in extraction_meta.get("warnings", []):
-                    msg = (item.get("message") or "").strip()
-                    if msg:
-                        warning_msgs.append(msg)
-
-                hint = "No FAQ pairs were detected for the provided URL."
+                error_text = "No FAQ pairs were detected for the provided URL."
                 if warning_msgs:
-                    hint = f"{hint} Details: {' | '.join(warning_msgs[:2])}"
+                    error_text = f"{error_text} Details: {' | '.join(warning_msgs[:2])}"
 
                 return templates.TemplateResponse(
                     "faq.html",
                     {
                         **base_context,
-                        "error": hint,
-                        "fetch_attempts": extraction_meta.get("attempts", []),
+                        "error": error_text,
+                        "pages": pages,
+                        "faqs": [],
+                        "fetch_attempts": fetch_attempts,
                         "llm_error": llm_error,
                         "cache_file": cache_file,
+                        "cache_hit": cache_hit,
+                        "site_name": result.get("site_name"),
+                        "qna_name": Path(result["qna_file"]).name if result.get("qna_file") else None,
+                        "page_count": result.get("page_count", len(pages)),
+                        "faq_count": 0,
+                        "duration": result.get("duration"),
+                        "warnings": warning_msgs,
                     },
                 )
 
-            saved_count = 0
-            if hasattr(extractor, "save_faqs_for_url_jsonl"):
-                try:
-                    saved_count, cache_file = extractor.save_faqs_for_url_jsonl(url, faqs)
-                except Exception as exc:
-                    llm_error = (llm_error + " | " if llm_error else "") + f"Could not save cache JSONL: {exc}"
-
-            success_message = f"Extracted {len(faqs)} FAQs from the target site."
-            if saved_count > 0:
-                success_message = f"{success_message} Saved {saved_count} FAQs to JSONL cache."
+            success_message = (
+                f"Loaded {len(faqs)} FAQs from cached JSONL for this URL."
+                if cache_hit
+                else f"Extracted {len(faqs)} FAQs from the target site."
+            )
 
             return templates.TemplateResponse(
                 "faq.html",
@@ -2388,10 +2370,17 @@ async def faq(request: Request):
                     **base_context,
                     "message": success_message,
                     "faqs": faqs[:30],
-                    "fetch_attempts": extraction_meta.get("attempts", []),
-                    "pages": extraction_meta.get("pages", []),
+                    "pages": pages,
+                    "fetch_attempts": fetch_attempts,
                     "llm_error": llm_error,
                     "cache_file": cache_file,
+                    "cache_hit": cache_hit,
+                    "site_name": result.get("site_name"),
+                    "qna_name": Path(result["qna_file"]).name if result.get("qna_file") else None,
+                    "page_count": result.get("page_count", len(pages)),
+                    "faq_count": len(faqs),
+                    "duration": result.get("duration"),
+                    "warnings": warning_msgs,
                 },
             )
         except Exception as exc:

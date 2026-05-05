@@ -86,14 +86,16 @@ WEATHER_API_KEY=your_openweather_api_key
 Preferred:
 
 ```bash
-uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload --reload-exclude "StudentAttendance/*"
 ```
 
-Compatibility launcher:
+If you do not need autoreload, you can also use:
 
 ```bash
 python app.py
 ```
+
+Compatibility launcher: `python app.py` remains available for legacy commands.
 
 Open:
 
