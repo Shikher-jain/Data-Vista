@@ -32,14 +32,14 @@
                 </div>
                 <div class="col-md-3">
                     <label for="grade" class="form-label">Grade</label>
-                    <input id="grade" type="number" step="any" class="form-control" name="grade" value="{{ grade_input or '' }}" placeholder="Grade" required>
+                    <input id="grade" type="number" min="1" step="any" class="form-control" name="grade" value="{{ grade_input or '' }}" placeholder="Grade" required>
                 </div>
                 <div class="col-md-3">
                     <label for="grade_range" class="form-label">Grade Range</label>
                     <select id="grade_range" class="form-select" name="grade_range">
                         <option value="1-5" {% if grade_range == '1-5' %}selected{% endif %}>1 - 5</option>
                         <option value="1-10" {% if grade_range == '1-10' %}selected{% endif %}>1 - 10</option>
-                        <option value="1-120" {% if grade_range == '1-120' %}selected{% endif %}>1 - 120</option>
+                        <option value="1-100" {% if grade_range == '1-100' %}selected{% endif %}>1 - 100</option>
                         <option value="custom" {% if grade_range == 'custom' %}selected{% endif %}>Custom</option>
                     </select>
                 </div>
@@ -49,16 +49,12 @@
             </div>
 
             <div id="custom-range-fields" class="row g-2 mt-2" style="display: none;">
-                <div class="col-md-3">
-                    <label for="custom_min" class="form-label">Custom Min</label>
-                    <input id="custom_min" type="number" step="any" class="form-control" name="custom_min" value="{{ custom_min or '' }}" placeholder="e.g. 0">
-                </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label for="custom_max" class="form-label">Custom Max</label>
-                    <input id="custom_max" type="number" step="any" class="form-control" name="custom_max" value="{{ custom_max or '' }}" placeholder="e.g. 100">
+                    <input id="custom_max" type="number" min="1" step="any" class="form-control" name="custom_max" value="{{ custom_max or '' }}" placeholder="e.g. 100">
                 </div>
-                <div class="col-md-6 d-flex align-items-end">
-                    <small class="text-muted">Choose custom min/max to validate the entered grade in your own range.</small>
+                <div class="col-md-8 d-flex align-items-end">
+                    <small class="text-muted">Minimum is fixed at 1. Enter only the maximum for custom ranges.</small>
                 </div>
             </div>
         </form>
@@ -71,7 +67,8 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Grade</th>
+                    <th>Marks</th>
+                    <th>Decimal Result</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -79,7 +76,8 @@
                 {% for row in records %}
                 <tr>
                     <td>{{ row.name }}</td>
-                    <td>{{ row.grade }}</td>
+                    <td>{{ row.marks }}</td>
+                    <td>{{ row.decimal_result }}</td>
                     <td class="text-end">
                         <form method="post" class="d-inline">
                             <input type="hidden" name="action" value="delete">
@@ -102,10 +100,9 @@
         const rangeSelect = document.getElementById('grade_range');
         const gradeInput = document.getElementById('grade');
         const customWrapper = document.getElementById('custom-range-fields');
-        const customMin = document.getElementById('custom_min');
         const customMax = document.getElementById('custom_max');
 
-        if (!rangeSelect || !gradeInput || !customWrapper || !customMin || !customMax) {
+        if (!rangeSelect || !gradeInput || !customWrapper || !customMax) {
             return;
         }
 
@@ -113,22 +110,15 @@
         const presets = {
             '1-5': [1, 5],
             '1-10': [1, 10],
-            '1-120': [1, 120],
+            '1-100': [1, 100],
         };
 
         if (selected === 'custom') {
             customWrapper.style.display = 'flex';
-            customMin.required = true;
             customMax.required = true;
+            gradeInput.min = 1;
 
-            const minVal = Number(customMin.value);
             const maxVal = Number(customMax.value);
-
-            if (!Number.isNaN(minVal)) {
-                gradeInput.min = minVal;
-            } else {
-                gradeInput.removeAttribute('min');
-            }
 
             if (!Number.isNaN(maxVal)) {
                 gradeInput.max = maxVal;
@@ -137,8 +127,8 @@
             }
         } else {
             customWrapper.style.display = 'none';
-            customMin.required = false;
             customMax.required = false;
+            gradeInput.min = 1;
 
             if (presets[selected]) {
                 gradeInput.min = presets[selected][0];
@@ -152,14 +142,10 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         const rangeSelect = document.getElementById('grade_range');
-        const customMin = document.getElementById('custom_min');
         const customMax = document.getElementById('custom_max');
 
         if (rangeSelect) {
             rangeSelect.addEventListener('change', updateGradeRangeUI);
-        }
-        if (customMin) {
-            customMin.addEventListener('input', updateGradeRangeUI);
         }
         if (customMax) {
             customMax.addEventListener('input', updateGradeRangeUI);

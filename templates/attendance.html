@@ -5,39 +5,20 @@
 {% block content %}
     <div class="container mt-4">
         <h1>Attendance System</h1>
-        <a href="https://attendease-shikher-09.streamlit.app/" 
-        target="_blank" 
-        class="btn btn-success mb-3">
-        Open Attend-Ease App 
-        </a>
-                
-        <p>{{ message }}</p>
-        <p>Note: The face-recognition flow lives in the StudentAttendance folder (register.py → train.py → mark_attendance.py). Run those locally to mark attendance.</p>
+        <p class="text-muted">{{ message }}</p>
 
-        <video id="video" width="640" height="480" autoplay></video>
-        <canvas id="canvas" width="640" height="480"></canvas>
-        
-        <script>
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            const context = canvas.getContext('2d');
+        {% if launch_message %}
+        <div class="alert alert-info">{{ launch_message }}</div>
+        {% endif %}
 
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(stream => {
-                    video.srcObject = stream;
-                })
-                .catch(err => {
-                    console.error('Error accessing camera: ', err);
-                });
+        <div class="card p-3 mb-3">
+            <h5 class="mb-2">Launch Local GUI</h5>
+            <p class="mb-3">This opens the Python face-recognition window from StudentAttendance/mark_attendance.py on the same machine that is running the FastAPI server.</p>
+            <p class="mb-0"><strong>Prerequisite:</strong> register and train the face model first if you have not already.</p>
+        </div>
 
-            // Basic face detection placeholder
-            // For actual recognition, need face-api.js or similar
-            video.addEventListener('play', () => {
-                setInterval(() => {
-                    context.drawImage(video, 0, 0, 640, 480);
-                    // Add face detection logic here
-                }, 100);
-            });
-        </script>
+        <form method="post" class="d-inline">
+            <button type="submit" class="btn btn-success mb-3">Open Attendance GUI</button>
+        </form>
     </div>
 {% endblock %}
