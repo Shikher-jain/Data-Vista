@@ -13,7 +13,7 @@
     </div>
 
     <div class="alert alert-info">
-        This guide documents page headings, form entries, parameter names, expected values, defaults, and backend validation behavior.
+        This guide documents page headings, form entries, parameter names, units/scales, expected values, defaults, and backend validation behavior.
     </div>
 
     <div class="card mb-4">
@@ -132,23 +132,24 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>model_type</td><td>string</td><td>Yes</td><td>basic or advanced. Defaults to basic.</td></tr>
-                    <tr><td>glucose</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
-                    <tr><td>bloodpressure</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
-                    <tr><td>insulin</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
-                    <tr><td>bmi</td><td>float</td><td>Yes (basic mode)</td><td>Must be a valid number, min 0.</td></tr>
-                    <tr><td>gender_adv</td><td>string</td><td>Yes (advanced mode)</td><td>Expected values from model metadata (typically Female, Male, Other).</td></tr>
-                    <tr><td>age_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Range: 0 to 120.</td></tr>
-                    <tr><td>hypertension_adv</td><td>int</td><td>Yes (advanced mode)</td><td>0 or 1.</td></tr>
-                    <tr><td>heart_disease_adv</td><td>int</td><td>Yes (advanced mode)</td><td>0 or 1.</td></tr>
-                    <tr><td>smoking_history_adv</td><td>string</td><td>Yes (advanced mode)</td><td>Expected values from metadata: Not applicable, current, former, never. Legacy aliases like No Info, ever, and not current are normalized.</td></tr>
-                    <tr><td>bmi_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Must be a valid number, min 0.</td></tr>
-                    <tr><td>hba1c_level_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Must be a valid number, min 0.</td></tr>
-                    <tr><td>blood_glucose_level_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>model_type</td><td>string</td><td>Yes</td><td>N/A</td><td>basic or advanced. Defaults to basic.</td></tr>
+                    <tr><td>glucose</td><td>float</td><td>Yes (basic mode)</td><td>mg/dL</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>bloodpressure</td><td>float</td><td>Yes (basic mode)</td><td>mmHg</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>insulin</td><td>float</td><td>Yes (basic mode)</td><td>uU/mL</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>bmi</td><td>float</td><td>Yes (basic mode)</td><td>kg/m^2</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>gender_adv</td><td>string</td><td>Yes (advanced mode)</td><td>N/A</td><td>Expected values from model metadata (typically Female, Male, Other).</td></tr>
+                    <tr><td>age_adv</td><td>float</td><td>Yes (advanced mode)</td><td>Years</td><td>Range: 0 to 120.</td></tr>
+                    <tr><td>hypertension_adv</td><td>int</td><td>Yes (advanced mode)</td><td>Binary flag</td><td>0 or 1.</td></tr>
+                    <tr><td>heart_disease_adv</td><td>int</td><td>Yes (advanced mode)</td><td>Binary flag</td><td>0 or 1.</td></tr>
+                    <tr><td>smoking_history_adv</td><td>string</td><td>Yes (advanced mode)</td><td>N/A</td><td>Expected values from metadata: Not applicable, current, former, never. Legacy aliases like No Info, ever, and not current are normalized.</td></tr>
+                    <tr><td>bmi_adv</td><td>float</td><td>Yes (advanced mode)</td><td>kg/m^2</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>hba1c_level_adv</td><td>float</td><td>Yes (advanced mode)</td><td>%</td><td>Must be a valid number, min 0.</td></tr>
+                    <tr><td>blood_glucose_level_adv</td><td>float</td><td>Yes (advanced mode)</td><td>mg/dL</td><td>Must be a valid number, min 0.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -163,13 +164,14 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>from_year</td><td>int</td><td>No</td><td>Range is dataset-driven: min_year to max_year.</td></tr>
-                    <tr><td>to_year</td><td>int</td><td>No</td><td>Range is dataset-driven: min_year to max_year. Must be greater than or equal to from_year.</td></tr>
-                    <tr><td>countries</td><td>list[string]</td><td>No</td><td>Country codes selected via checkboxes. Invalid codes are ignored. Defaults are auto-applied if empty.</td></tr>
+                    <tr><td>from_year</td><td>int</td><td>No</td><td>Year</td><td>Range is dataset-driven: min_year to max_year.</td></tr>
+                    <tr><td>to_year</td><td>int</td><td>No</td><td>Year</td><td>Range is dataset-driven: min_year to max_year. Must be greater than or equal to from_year.</td></tr>
+                    <tr><td>countries</td><td>list[string]</td><td>No</td><td>Country codes</td><td>Country codes selected via checkboxes. Invalid codes are ignored. Defaults are auto-applied if empty.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -184,16 +186,17 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>option</td><td>string</td><td>Yes</td><td>Teams, Team vs Team, Team Record, Batsman Stats, Bowler Stats.</td></tr>
-                    <tr><td>t1</td><td>string</td><td>Yes (Team vs Team)</td><td>Must be a valid team.</td></tr>
-                    <tr><td>t2</td><td>string</td><td>Yes (Team vs Team)</td><td>Must be a valid team and different from t1.</td></tr>
-                    <tr><td>team</td><td>string</td><td>Yes (Team Record)</td><td>Must be a valid team.</td></tr>
-                    <tr><td>batsman</td><td>string</td><td>Yes (Batsman Stats)</td><td>Must be a valid player from dataset.</td></tr>
-                    <tr><td>bowler</td><td>string</td><td>Yes (Bowler Stats)</td><td>Must be a valid player from dataset.</td></tr>
+                    <tr><td>option</td><td>string</td><td>Yes</td><td>N/A</td><td>Teams, Team vs Team, Team Record, Batsman Stats, Bowler Stats.</td></tr>
+                    <tr><td>t1</td><td>string</td><td>Yes (Team vs Team)</td><td>N/A</td><td>Must be a valid team.</td></tr>
+                    <tr><td>t2</td><td>string</td><td>Yes (Team vs Team)</td><td>N/A</td><td>Must be a valid team and different from t1.</td></tr>
+                    <tr><td>team</td><td>string</td><td>Yes (Team Record)</td><td>N/A</td><td>Must be a valid team.</td></tr>
+                    <tr><td>batsman</td><td>string</td><td>Yes (Batsman Stats)</td><td>N/A</td><td>Must be a valid player from dataset.</td></tr>
+                    <tr><td>bowler</td><td>string</td><td>Yes (Bowler Stats)</td><td>N/A</td><td>Must be a valid player from dataset.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -208,11 +211,12 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>city</td><td>string</td><td>Yes</td><td>City name text input.</td></tr>
+                    <tr><td>city</td><td>string</td><td>Yes</td><td>N/A</td><td>City name text input.</td></tr>
                 </tbody>
             </table>
             <p class="mb-0"><strong>Server requirement:</strong> WEATHER_API_KEY environment variable must be configured.</p>
@@ -228,13 +232,14 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>input_type</td><td>string</td><td>Yes</td><td>Paste Resume or Enter Skills.</td></tr>
-                    <tr><td>resume_text</td><td>string</td><td>Yes (when input_type=Paste Resume)</td><td>Free text resume/profile content.</td></tr>
-                    <tr><td>skills</td><td>string</td><td>Yes (when input_type=Enter Skills)</td><td>Comma-separated skill list.</td></tr>
+                    <tr><td>input_type</td><td>string</td><td>Yes</td><td>N/A</td><td>Paste Resume or Enter Skills.</td></tr>
+                    <tr><td>resume_text</td><td>string</td><td>Yes (when input_type=Paste Resume)</td><td>N/A</td><td>Free text resume/profile content.</td></tr>
+                    <tr><td>skills</td><td>string</td><td>Yes (when input_type=Enter Skills)</td><td>N/A</td><td>Comma-separated skill list.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -249,13 +254,14 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>state</td><td>string</td><td>No</td><td>Overall INDIA or a valid state name. Invalid values fallback to Overall INDIA.</td></tr>
-                    <tr><td>x_metric</td><td>string</td><td>No</td><td>Must be one of available numeric metrics for current scope.</td></tr>
-                    <tr><td>y_metric</td><td>string</td><td>No</td><td>Must be one of available numeric metrics for current scope.</td></tr>
+                    <tr><td>state</td><td>string</td><td>No</td><td>N/A</td><td>Overall INDIA or a valid state name. Invalid values fallback to Overall INDIA.</td></tr>
+                    <tr><td>x_metric</td><td>string</td><td>No</td><td>Depends on selected metric</td><td>Must be one of available numeric metrics for current scope.</td></tr>
+                    <tr><td>y_metric</td><td>string</td><td>No</td><td>Depends on selected metric</td><td>Must be one of available numeric metrics for current scope.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -278,16 +284,17 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>action</td><td>string</td><td>Yes (POST)</td><td>add or delete.</td></tr>
-                    <tr><td>name</td><td>string</td><td>Yes</td><td>Required for add and delete actions.</td></tr>
-                    <tr><td>grade</td><td>float</td><td>Yes (action=add)</td><td>Validated against selected grade_range.</td></tr>
-                    <tr><td>grade_range</td><td>string</td><td>No</td><td>1-5, 1-10, 1-120, or custom. Default: 1-10.</td></tr>
-                    <tr><td>custom_min</td><td>float</td><td>Yes (grade_range=custom)</td><td>Custom lower bound.</td></tr>
-                    <tr><td>custom_max</td><td>float</td><td>Yes (grade_range=custom)</td><td>Must be greater than custom_min.</td></tr>
+                    <tr><td>action</td><td>string</td><td>Yes (POST)</td><td>N/A</td><td>add or delete.</td></tr>
+                    <tr><td>name</td><td>string</td><td>Yes</td><td>N/A</td><td>Required for add and delete actions.</td></tr>
+                    <tr><td>grade</td><td>float</td><td>Yes (action=add)</td><td>Score points</td><td>Validated against selected grade_range.</td></tr>
+                    <tr><td>grade_range</td><td>string</td><td>No</td><td>Score scale</td><td>1-5, 1-10, 1-120, or custom. Default: 1-10.</td></tr>
+                    <tr><td>custom_min</td><td>float</td><td>Yes (grade_range=custom)</td><td>Score points</td><td>Custom lower bound.</td></tr>
+                    <tr><td>custom_max</td><td>float</td><td>Yes (grade_range=custom)</td><td>Score points</td><td>Must be greater than custom_min.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -302,19 +309,20 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>lot_area</td><td>float</td><td>Yes</td><td>Min 0.</td></tr>
-                    <tr><td>year_built</td><td>int</td><td>Yes</td><td>Range 1800 to 2100.</td></tr>
-                    <tr><td>first_flr_sf</td><td>float</td><td>Yes</td><td>Min 0.</td></tr>
-                    <tr><td>second_flr_sf</td><td>float</td><td>Yes</td><td>Min 0.</td></tr>
-                    <tr><td>full_bath</td><td>int</td><td>Yes</td><td>Range 0 to 20.</td></tr>
-                    <tr><td>bedroom_abv_gr</td><td>int</td><td>Yes</td><td>Range 0 to 20.</td></tr>
-                    <tr><td>tot_rms_abv_grd</td><td>int</td><td>Yes</td><td>Range 0 to 30.</td></tr>
-                    <tr><td>overall_qual</td><td>int</td><td>Yes</td><td>Range 1 to 10.</td></tr>
-                    <tr><td>overall_cond</td><td>int</td><td>Yes</td><td>Range 1 to 10.</td></tr>
+                    <tr><td>lot_area</td><td>float</td><td>Yes</td><td>sq ft</td><td>Min 0.</td></tr>
+                    <tr><td>year_built</td><td>int</td><td>Yes</td><td>Year</td><td>Range 1800 to 2100.</td></tr>
+                    <tr><td>first_flr_sf</td><td>float</td><td>Yes</td><td>sq ft</td><td>Min 0.</td></tr>
+                    <tr><td>second_flr_sf</td><td>float</td><td>Yes</td><td>sq ft</td><td>Min 0.</td></tr>
+                    <tr><td>full_bath</td><td>int</td><td>Yes</td><td>Count</td><td>Range 0 to 20.</td></tr>
+                    <tr><td>bedroom_abv_gr</td><td>int</td><td>Yes</td><td>Count</td><td>Range 0 to 20.</td></tr>
+                    <tr><td>tot_rms_abv_grd</td><td>int</td><td>Yes</td><td>Count</td><td>Range 0 to 30.</td></tr>
+                    <tr><td>overall_qual</td><td>int</td><td>Yes</td><td>Rating (1-10)</td><td>Range 1 to 10.</td></tr>
+                    <tr><td>overall_cond</td><td>int</td><td>Yes</td><td>Rating (1-10)</td><td>Range 1 to 10.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -329,23 +337,24 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>company</td><td>string</td><td>Yes</td><td>Must be one of loaded company values from model dataframe.</td></tr>
-                    <tr><td>type</td><td>string</td><td>Yes</td><td>Must be one of loaded TypeName values.</td></tr>
-                    <tr><td>ram</td><td>int</td><td>Yes</td><td>Min 1. UI offers standard RAM options.</td></tr>
-                    <tr><td>weight</td><td>float</td><td>Yes</td><td>Min 0.1.</td></tr>
-                    <tr><td>touchscreen</td><td>string</td><td>Yes</td><td>Yes or No.</td></tr>
-                    <tr><td>ips</td><td>string</td><td>Yes</td><td>Yes or No.</td></tr>
-                    <tr><td>screen_size</td><td>float</td><td>Yes</td><td>Min 1 (UI suggests 10 to 18 inches).</td></tr>
-                    <tr><td>resolution</td><td>string</td><td>Yes</td><td>Must include x separator, format WIDTHxHEIGHT.</td></tr>
-                    <tr><td>cpu</td><td>string</td><td>Yes</td><td>Must be one of loaded CPU brand values.</td></tr>
-                    <tr><td>hdd</td><td>int</td><td>Yes</td><td>Min 0.</td></tr>
-                    <tr><td>ssd</td><td>int</td><td>Yes</td><td>Min 0.</td></tr>
-                    <tr><td>gpu</td><td>string</td><td>Yes</td><td>Must be one of loaded GPU brand values.</td></tr>
-                    <tr><td>os</td><td>string</td><td>Yes</td><td>Must be one of loaded OS values.</td></tr>
+                    <tr><td>company</td><td>string</td><td>Yes</td><td>N/A</td><td>Must be one of loaded company values from model dataframe.</td></tr>
+                    <tr><td>type</td><td>string</td><td>Yes</td><td>N/A</td><td>Must be one of loaded TypeName values.</td></tr>
+                    <tr><td>ram</td><td>int</td><td>Yes</td><td>GB</td><td>Min 1. UI offers standard RAM options.</td></tr>
+                    <tr><td>weight</td><td>float</td><td>Yes</td><td>kg</td><td>Min 0.1.</td></tr>
+                    <tr><td>touchscreen</td><td>string</td><td>Yes</td><td>Boolean choice</td><td>Yes or No.</td></tr>
+                    <tr><td>ips</td><td>string</td><td>Yes</td><td>Boolean choice</td><td>Yes or No.</td></tr>
+                    <tr><td>screen_size</td><td>float</td><td>Yes</td><td>Inches</td><td>Min 1 (UI suggests 10 to 18 inches).</td></tr>
+                    <tr><td>resolution</td><td>string</td><td>Yes</td><td>Pixels</td><td>Must include x separator, format WIDTHxHEIGHT.</td></tr>
+                    <tr><td>cpu</td><td>string</td><td>Yes</td><td>N/A</td><td>Must be one of loaded CPU brand values.</td></tr>
+                    <tr><td>hdd</td><td>int</td><td>Yes</td><td>GB</td><td>Min 0.</td></tr>
+                    <tr><td>ssd</td><td>int</td><td>Yes</td><td>GB</td><td>Min 0.</td></tr>
+                    <tr><td>gpu</td><td>string</td><td>Yes</td><td>N/A</td><td>Must be one of loaded GPU brand values.</td></tr>
+                    <tr><td>os</td><td>string</td><td>Yes</td><td>N/A</td><td>Must be one of loaded OS values.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -360,18 +369,19 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>db1_sql</td><td>string</td><td>Conditional</td><td>Required with db2_sql when using text mode.</td></tr>
-                    <tr><td>db2_sql</td><td>string</td><td>Conditional</td><td>Required with db1_sql when using text mode.</td></tr>
-                    <tr><td>db1_file</td><td>file</td><td>Conditional</td><td>Required with db2_file when using upload mode. Must be .sql and non-empty.</td></tr>
-                    <tr><td>db2_file</td><td>file</td><td>Conditional</td><td>Required with db1_file when using upload mode. Must be .sql and non-empty.</td></tr>
-                    <tr><td>query_pair_id</td><td>string</td><td>No</td><td>One of predefined SQL query pair IDs. Defaults to first pair.</td></tr>
-                    <tr><td>warmup_runs_raw</td><td>int</td><td>No</td><td>Clamped to 0 to 10. Default 1.</td></tr>
-                    <tr><td>measured_runs_raw</td><td>int</td><td>No</td><td>Clamped to 1 to 30. Default 6.</td></tr>
-                    <tr><td>use_llm</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on.</td></tr>
+                    <tr><td>db1_sql</td><td>string</td><td>Conditional</td><td>N/A</td><td>Required with db2_sql when using text mode.</td></tr>
+                    <tr><td>db2_sql</td><td>string</td><td>Conditional</td><td>N/A</td><td>Required with db1_sql when using text mode.</td></tr>
+                    <tr><td>db1_file</td><td>file</td><td>Conditional</td><td>SQL file</td><td>Required with db2_file when using upload mode. Must be .sql and non-empty.</td></tr>
+                    <tr><td>db2_file</td><td>file</td><td>Conditional</td><td>SQL file</td><td>Required with db1_file when using upload mode. Must be .sql and non-empty.</td></tr>
+                    <tr><td>query_pair_id</td><td>string</td><td>No</td><td>N/A</td><td>One of predefined SQL query pair IDs. Defaults to first pair.</td></tr>
+                    <tr><td>warmup_runs_raw</td><td>int</td><td>No</td><td>Runs</td><td>Clamped to 0 to 10. Default 1.</td></tr>
+                    <tr><td>measured_runs_raw</td><td>int</td><td>No</td><td>Runs</td><td>Clamped to 1 to 30. Default 6.</td></tr>
+                    <tr><td>use_llm</td><td>bool-like string</td><td>No</td><td>Boolean flag</td><td>Accepted truthy values: 1, true, yes, on.</td></tr>
                 </tbody>
             </table>
             <p class="mb-1"><strong>Mode behavior:</strong> if both db1_sql and db2_sql look like executable queries, they are treated as slow/optimized benchmark queries and schema-diff is skipped.</p>
@@ -388,19 +398,20 @@
                         <th>Parameter</th>
                         <th>Type</th>
                         <th>Required</th>
+                        <th>Units / Scale</th>
                         <th>Rules / Accepted Values</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td>url</td><td>string</td><td>Yes</td><td>Must be a valid http:// or https:// URL.</td></tr>
-                    <tr><td>crawl_depth</td><td>int</td><td>No</td><td>Range 0 to 5. Default 1.</td></tr>
-                    <tr><td>max_follow_links</td><td>int</td><td>No</td><td>Range 1 to 120. Default 12.</td></tr>
-                    <tr><td>max_workers</td><td>int</td><td>No</td><td>Range 1 to 20. Default 8.</td></tr>
-                    <tr><td>timeout</td><td>int</td><td>No</td><td>Range 5 to 90 seconds. Default 20.</td></tr>
-                    <tr><td>min_answer_len</td><td>int</td><td>No</td><td>Range 0 to 3000. Default 20.</td></tr>
-                    <tr><td>allow_dynamic</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on. Default true.</td></tr>
-                    <tr><td>reuse_cache</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on. Default true.</td></tr>
-                    <tr><td>use_llm_cleanup</td><td>bool-like string</td><td>No</td><td>Accepted truthy values: 1, true, yes, on. Default false.</td></tr>
+                    <tr><td>url</td><td>string</td><td>Yes</td><td>N/A</td><td>Must be a valid http:// or https:// URL.</td></tr>
+                    <tr><td>crawl_depth</td><td>int</td><td>No</td><td>Levels</td><td>Range 0 to 5. Default 1.</td></tr>
+                    <tr><td>max_follow_links</td><td>int</td><td>No</td><td>Links/pages</td><td>Range 1 to 120. Default 12.</td></tr>
+                    <tr><td>max_workers</td><td>int</td><td>No</td><td>Workers</td><td>Range 1 to 20. Default 8.</td></tr>
+                    <tr><td>timeout</td><td>int</td><td>No</td><td>Seconds</td><td>Range 5 to 90 seconds. Default 20.</td></tr>
+                    <tr><td>min_answer_len</td><td>int</td><td>No</td><td>Characters</td><td>Range 0 to 3000. Default 20.</td></tr>
+                    <tr><td>allow_dynamic</td><td>bool-like string</td><td>No</td><td>Boolean flag</td><td>Accepted truthy values: 1, true, yes, on. Default true.</td></tr>
+                    <tr><td>reuse_cache</td><td>bool-like string</td><td>No</td><td>Boolean flag</td><td>Accepted truthy values: 1, true, yes, on. Default true.</td></tr>
+                    <tr><td>use_llm_cleanup</td><td>bool-like string</td><td>No</td><td>Boolean flag</td><td>Accepted truthy values: 1, true, yes, on. Default false.</td></tr>
                 </tbody>
             </table>
             <p class="mb-0"><strong>Server requirement for LLM cleanup:</strong> GROQ_API_KEY environment variable must be configured.</p>
