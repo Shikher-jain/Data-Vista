@@ -6,7 +6,7 @@
 <div class="container mt-5">
     <div class="alert alert-danger">
         <h4 class="alert-heading">{{ title or 'Error' }}</h4>
-        <p class="mb-0">{{ error or 'Something went wrong.' }}</p>
+        <p class="mb-0">{{ error or message or 'Something went wrong.' }}</p>
     </div>
     <a href="/" class="btn btn-secondary">Back to Home</a>
 </div>

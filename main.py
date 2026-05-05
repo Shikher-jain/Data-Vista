@@ -22,7 +22,7 @@ except Exception:
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Form, File, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -962,13 +962,10 @@ def is_valid_http_url(value: str) -> bool:
 async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
     if request.url.path.startswith("/api/"):
         return JSONResponse(status_code=422, content={"error": "Invalid request payload.", "details": exc.errors()})
-    return templates.TemplateResponse(
-        "error.html",
-        {
-            "request": request,
-            "title": "Invalid Input",
-            "error": "Some fields were missing or invalid. Please review your input and try again.",
-        },
+    return render_error_response(
+        request,
+        "Invalid Input",
+        "Some fields were missing or invalid. Please review your input and try again.",
         status_code=422,
     )
 
@@ -977,15 +974,13 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
 async def unhandled_exception_handler(request: Request, exc: Exception):
     if request.url.path.startswith("/api/"):
         return JSONResponse(status_code=500, content={"error": "Internal server error."})
-    return templates.TemplateResponse(
-        "error.html",
-        {
-            "request": request,
-            "title": "Unexpected Error",
-            "error": "Something went wrong while processing your request. Please try again.",
-        },
+    return render_error_response(
+        request,
+        "Unexpected Error",
+        "Something went wrong while processing your request. Please try again.",
         status_code=500,
     )
+
 
 
 def load_ipl_data():
@@ -1224,11 +1219,34 @@ def generate_learning_plan(role_title, missing_skills):
                 plan["90 Days"].append(f"Master {skill} and apply it in a portfolio project.")
     return plan
 
+def safe_value(v):
+    if isinstance(v, (str, int, float, bool, type(None))):
+        return v
+    return str(v)
+
+
+def render_error_response(request: Request, title: str, error: Any, status_code: int = 500):
+    context = {
+        "request": request,
+        "title": safe_value(title),
+        "error": safe_value(error),
+        "message": safe_value(error),
+    }
+
+    try:
+        return templates.TemplateResponse("error.html", context, status_code=status_code)
+    except Exception:
+        return PlainTextResponse(f"{safe_value(title)}: {safe_value(error)}", status_code=status_code)
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "storage_warning": DATA_STORE_ERROR})
-
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "storage_warning": bool(DATA_STORE_ERROR),
+        },
+    )
 
 @app.get("/parameters", response_class=HTMLResponse)
 def parameters_reference(request: Request):
