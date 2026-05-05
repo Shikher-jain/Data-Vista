@@ -1959,7 +1959,7 @@ async def house(request: Request):
             overall_qual = parse_int(form, "overall_qual", "Overall Quality", min_value=1, max_value=10)
             overall_cond = parse_int(form, "overall_cond", "Overall Condition", min_value=1, max_value=10)
         except ValueError as exc:
-            return templates.TemplateResponse("house.html", {"request": request, "error": str(exc)})
+            return templates.TemplateResponse(request, "house.html", {"error": str(exc)})
 
         input_data = pd.DataFrame(
             {
@@ -1980,12 +1980,20 @@ async def house(request: Request):
 
         model = load_house_model()
         if model is None:
-            return templates.TemplateResponse("house.html", {"request": request, "error": "Model file is missing on the server."})
+            return templates.TemplateResponse(
+                request,
+                "house.html",
+                {"error": "Model file is missing on the server."},
+            )
 
         prediction = model.predict(input_data)[0]
-        return templates.TemplateResponse("house.html", {"request": request, "prediction": round(prediction, 2)})
+        return templates.TemplateResponse(
+            request,
+            "house.html",
+            {"prediction": round(prediction, 2)},
+        )
 
-    return templates.TemplateResponse("house.html", {"request": request})
+    return templates.TemplateResponse(request, "house.html", {})
 
 
 @app.api_route("/laptop", methods=["GET", "POST"], response_class=HTMLResponse)
