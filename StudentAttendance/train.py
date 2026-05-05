@@ -5,7 +5,15 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 data_path = BASE_DIR / 'student_images'
+if not data_path.exists():
+    print("Error: student_images directory does not exist. Run register.py first.")
+    raise SystemExit(1)
+
 dirs = [d for d in listdir(data_path)]
+if not dirs:
+    print("Error: No student image folders found. Run register.py first.")
+    raise SystemExit(1)
+
 faces = []
 labels = []
 label_map = {}
@@ -23,6 +31,10 @@ for folder in dirs:
     label_id += 1
 
 model = cv2.face.LBPHFaceRecognizer_create()
+if not faces:
+    print("Error: No face images found. Run register.py first.")
+    raise SystemExit(1)
+
 model.train(np.asarray(faces), np.asarray(labels))
 model.save(str(BASE_DIR / "face_model.yml"))
 

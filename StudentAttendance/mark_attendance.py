@@ -1,6 +1,9 @@
 import csv
 from datetime import datetime
 from pathlib import Path
+import os
+
+os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_MSMF", "0")
 
 import cv2
 import pickle
@@ -12,13 +15,35 @@ if face_cascade.empty():
     print("Error: Haarcascade XML file not loaded properly.")
     raise SystemExit(1)
 
+model_path = BASE_DIR / "face_model.yml"
+labels_path = BASE_DIR / "labels.pkl"
+if not model_path.exists():
+    print("Error: Trained face model not found. Run train.py first.")
+    raise SystemExit(1)
+if not labels_path.exists():
+    print("Error: labels.pkl not found. Run train.py first.")
+    raise SystemExit(1)
+
+
+def open_camera(index=0):
+    backend = getattr(cv2, "CAP_DSHOW", None)
+    if backend is not None:
+        camera = cv2.VideoCapture(index, backend)
+        if camera.isOpened():
+            return camera
+        camera.release()
+    return cv2.VideoCapture(index)
+
 model = cv2.face.LBPHFaceRecognizer_create()
-model.read(str(BASE_DIR / "face_model.yml"))
+model.read(str(model_path))
 
-with open(BASE_DIR / "labels.pkl", "rb") as f:
+with open(labels_path, "rb") as f:
     labels = pickle.load(f)
+cap = open_camera(0)
+if not cap.isOpened():
+    print("Error: Unable to open the camera. Check camera permissions or close apps using the webcam.")
+    raise SystemExit(1)
 
-cap = cv2.VideoCapture(0)
 marked = set()
 
 with open(BASE_DIR / "attendance.csv", "a", newline="") as f:

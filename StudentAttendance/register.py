@@ -1,6 +1,11 @@
-import cv2
 import os
+import sys
+import re
 from pathlib import Path
+
+os.environ.setdefault("OPENCV_VIDEOIO_PRIORITY_MSMF", "0")
+
+import cv2
 
 # Load Haar Cascade
 # face_classifier = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
@@ -10,8 +15,29 @@ if face_classifier.empty():
     print("Error: Haarcascade XML file not loaded properly.")
     exit()
 
+
+def open_camera(index=0):
+    backend = getattr(cv2, "CAP_DSHOW", None)
+    if backend is not None:
+        camera = cv2.VideoCapture(index, backend)
+        if camera.isOpened():
+            return camera
+        camera.release()
+    return cv2.VideoCapture(index)
+
+
+def normalize_student_name(name):
+    cleaned = re.sub(r"[^\w\s.-]+", "_", name or "")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned or "student"
+
 def capture_face(name):
-    cam = cv2.VideoCapture(0)
+    name = normalize_student_name(name)
+    cam = open_camera(0)
+    if not cam.isOpened():
+        print("Error: Unable to open the camera. Check camera permissions or close apps using the webcam.")
+        return
+
     count = 0
     path = BASE_DIR / 'student_images' / name
     os.makedirs(path, exist_ok=True)
@@ -61,6 +87,6 @@ def capture_face(name):
     print(" Now run: python train.py to train your recognizer.")
 
 if __name__ == "__main__":
-    username = input("Enter student name: ")
+    username = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].strip() else input("Enter student name: ")
 
     capture_face(username)
