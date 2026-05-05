@@ -18,7 +18,7 @@ def format_response(weather):
 		desc = weather['weather'][0]['description']
 		temp = weather['main']['temp']
 
-		final_str = 'City: %s \nConditions: %s \nTemperature (°F): %s' % (name, desc, temp)
+		final_str = 'City: %s \nConditions: %s \nTemperature (°C): %s' % (name, desc, temp)
 	except:
 		final_str = 'There was a problem retrieving that information'
 
@@ -27,7 +27,7 @@ def format_response(weather):
 def get_weather(city):
 	weather_key = 'a4aa5e3d83ffefaba8c00284de6ef7c3'
 	url = 'https://api.openweathermap.org/data/2.5/weather'
-	params = {'APPID': weather_key, 'q': city, 'units': 'imperial'}
+	params = {'APPID': weather_key, 'q': city, 'units': 'metric'}
 	response = requests.get(url, params=params)
 	weather = response.json()
 
