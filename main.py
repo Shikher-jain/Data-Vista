@@ -33,6 +33,7 @@ import joblib
 import requests
 import plotly.express as px
 import plotly.offline as pyo
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sentence_transformers import SentenceTransformer
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler
@@ -51,7 +52,13 @@ if InconsistentVersionWarning is not None:
 load_dotenv()
 
 app = FastAPI(title="Data Vista FastAPI")
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(
+    env=Environment(
+        loader=FileSystemLoader("templates"),
+        autoescape=select_autoescape(["html", "xml"]),
+        cache_size=0,
+    )
+)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Cached artifacts
@@ -1227,26 +1234,21 @@ def safe_value(v):
 
 def render_error_response(request: Request, title: str, error: Any, status_code: int = 500):
     context = {
-        "request": request,
         "title": safe_value(title),
         "error": safe_value(error),
         "message": safe_value(error),
     }
 
     try:
-        return templates.TemplateResponse("error.html", context, status_code=status_code)
+        return templates.TemplateResponse(request, "error.html", context, status_code=status_code)
     except Exception:
         return PlainTextResponse(f"{safe_value(title)}: {safe_value(error)}", status_code=status_code)
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "storage_warning": bool(DATA_STORE_ERROR),
-        },
-    )
+    print("TYPE:", type(DATA_STORE_ERROR))
+    print("VALUE:", DATA_STORE_ERROR)
+    return templates.TemplateResponse(request, "index.html", {"storage_warning": bool(DATA_STORE_ERROR)})
 
 @app.get("/parameters", response_class=HTMLResponse)
 def parameters_reference(request: Request):
