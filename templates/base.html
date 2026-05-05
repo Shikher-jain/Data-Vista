@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}DATAVISTA{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap"
+        rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
@@ -14,35 +17,50 @@
     <link rel="stylesheet" href="{{ request.url_for('static', path='style.css') }}">
 
 </head>
+
 <body>
     {% set current_path = request.url.path %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark app-navbar fixed-top">
         <div class="container">
             <a class="navbar-brand brand-mark" href="/"><i class="fas fa-chart-line"></i><span>DATAVISTA</span></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#datavistaNavbar" aria-controls="datavistaNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#datavistaNavbar"
+                aria-controls="datavistaNavbar" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="datavistaNavbar">
                 <div class="navbar-nav ms-auto">
-                    <a class="nav-link {% if current_path == '/laptop' %}active{% endif %}" href="/laptop">Laptop Price Predictor</a>
-                    <a class="nav-link {% if current_path == '/diabetes' %}active{% endif %}" href="/diabetes">Diabetes Prediction</a>
-                    <a class="nav-link {% if current_path == '/house' %}active{% endif %}" href="/house">House Prediction</a>
+                    <a class="nav-link {% if current_path == '/laptop' %}active{% endif %}" href="/laptop">Laptop Price
+                        Predictor</a>
+                    <a class="nav-link {% if current_path == '/diabetes' %}active{% endif %}" href="/diabetes">Diabetes
+                        Prediction</a>
+                    <a class="nav-link {% if current_path == '/house' %}active{% endif %}" href="/house">House
+                        Prediction</a>
 
                     <a class="nav-link {% if current_path == '/gdp' %}active{% endif %}" href="/gdp">GDP Dashboard</a>
                     <a class="nav-link {% if current_path == '/ipl' %}active{% endif %}" href="/ipl">IPL App</a>
-                    <a class="nav-link {% if current_path == '/census' %}active{% endif %}" href="/census">India Census</a>
-                    
-                    <a class="nav-link {% if current_path == '/weather' %}active{% endif %}" href="/weather">Weather App</a>
-                    
-                    <a class="nav-link {% if current_path == '/skill' %}active{% endif %}" href="/skill">Skill Advisory</a>
-                    
-                    <a class="nav-link {% if current_path == '/students' %}active{% endif %}" href="/students">Student Management</a>
-                    <a class="nav-link {% if current_path == '/attendance' %}active{% endif %}" href="/attendance">Attendance System</a>
+                    <a class="nav-link {% if current_path == '/census' %}active{% endif %}" href="/census">India
+                        Census</a>
+
+                    <a class="nav-link {% if current_path == '/weather' %}active{% endif %}" href="/weather">Weather
+                        App</a>
+
+                    <a class="nav-link {% if current_path == '/skill' %}active{% endif %}" href="/skill">Skill
+                        Advisory</a>
+
+                    <a class="nav-link {% if current_path == '/students' %}active{% endif %}" href="/students">Student
+                        Management</a>
+                    <a class="nav-link {% if current_path == '/attendance' %}active{% endif %}"
+                        href="/attendance">Attendance System</a>
                     <a class="nav-link {% if current_path == '/sql' %}active{% endif %}" href="/sql">SQL Comparison</a>
                     <a class="nav-link {% if current_path == '/faq' %}active{% endif %}" href="/faq">FAQ Extractor</a>
-                    
-                    <a class="nav-link {% if current_path == '/parameters' %}active{% endif %}" href="/parameters">Parameter Guide</a>
-                    <button id="theme-toggle" class="theme-toggle" title="Toggle Theme" aria-label="Toggle theme">🌙</button>
+
+                    <a class="nav-link {% if current_path == '/chatbot' %}active{% endif %}" href="/chatbot">
+                        Vista Bot</a>
+
+                    <a class="nav-link {% if current_path == '/parameters' %}active{% endif %}"
+                        href="/parameters">Parameter Guide</a>
+                    <button id="theme-toggle" class="theme-toggle" title="Toggle Theme"
+                        aria-label="Toggle theme">🌙</button>
                 </div>
             </div>
         </div>
@@ -55,5 +73,260 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', path='script.js') }}"></script>
 
+    
+    {% if not embed %}
+    <style>
+        .chatbot-float-btn {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            z-index: 9999;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0a4f6e, #0c8db8);
+            border: none;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(10, 79, 110, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            transition: all 0.25s ease;
+            animation: pulse 2.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(12, 141, 184, 0.6);
+            }
+
+            70% {
+                box-shadow: 0 0 0 14px rgba(12, 141, 184, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(12, 141, 184, 0);
+            }
+        }
+
+        .chatbot-float-btn:hover {
+            transform: scale(1.12);
+        }
+
+        /* Notification badge */
+        .chatbot-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #ff4d4f;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 999px;
+        }
+
+        /* Overlay */
+        .chatbot-popup-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(6px);
+            z-index: 10000;
+        }
+
+        .chatbot-popup-overlay.open {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Modal */
+
+        .chatbot-popup-container {
+            width: 92vw;
+            max-width: 620px;
+            height: 82vh;
+            border-radius: 18px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+            transform: translateY(20px) scale(0.96);
+            opacity: 0;
+            transition: all 0.25s ease;
+        }
+
+        .chatbot-popup-overlay.open .chatbot-popup-container {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+        }
+
+            /* Product header styles */
+            .chatbot-header-left {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .ai-avatar {
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.12);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 800;
+                color: #fff;
+                flex-shrink: 0;
+            }
+
+            .ai-status {
+                font-size: 11px;
+                opacity: 0.85;
+                margin: 0;
+            }
+
+            .chatbot-loader { padding: 12px 16px; }
+            .loader-bar { height: 10px; background: #e2e8f0; margin-bottom: 8px; border-radius: 6px; animation: pulse 1.5s infinite; }
+            .loader-bar:last-child { width: 72%; }
+
+            .chatbot-popup-close {
+                background: rgba(255, 255, 255, 0.18);
+                border: none;
+                color: white;
+                font-size: 18px;
+                width: 40px;
+                height: 40px;
+                border-radius: 8px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s ease;
+            }
+
+            .chatbot-popup-close:hover {
+                background: rgba(255, 255, 255, 0.3);
+            }
+
+        /* Header */
+        .chatbot-popup-header {
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #0a4f6e, #0c8db8);
+            color: white;
+        }
+
+        /* Online indicator */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff9d;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+
+        /* Body */
+        .chatbot-popup-body {
+            flex: 1;
+        }
+
+        .chatbot-popup-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+
+    <button id="chatbot-float-btn" class="chatbot-float-btn">
+        <i class="fas fa-comments"></i>
+        <span class="chatbot-badge">1</span>
+    </button>
+
+    <div id="chatbot-popup-overlay" class="chatbot-popup-overlay">
+        <div class="chatbot-popup-container">
+                <!-- Productized header -->
+                <div class="chatbot-popup-header">
+                    <div class="chatbot-header-left">
+                        <div class="ai-avatar">AI</div>
+                        <div>
+                            <h3>DataVista AI</h3>
+                            <p class="ai-status">Live • Analytics Assistant</p>
+                        </div>
+                    </div>
+
+                    <button class="chatbot-popup-close" id="chatbot-popup-close" aria-label="Close chatbot">✕</button>
+                </div>
+
+                <div id="chatbot-loader" class="chatbot-loader" aria-hidden="true">
+                    <div class="loader-bar"></div>
+                    <div class="loader-bar"></div>
+                </div>
+
+                <div class="chatbot-popup-body">
+                    <iframe id="chatbot-popup-iframe" title="DataVista Assistant"></iframe>
+                </div>
+            </div>
+    </div>
+
+    <script>
+
+        (() => {
+            const floatBtn = document.getElementById('chatbot-float-btn');
+            const overlay = document.getElementById('chatbot-popup-overlay');
+            const closeBtn = document.getElementById('chatbot-popup-close');
+            const iframe = document.getElementById('chatbot-popup-iframe');
+
+            const CHAT_KEY = "chatbot_opened";
+
+            // Lazy load + prefetch
+            const loadChat = () => {
+                if (!iframe.src) {
+                    iframe.src = "{{ request.url_for('chatbot_page') }}";
+                }
+            };
+
+            // Open
+            floatBtn.addEventListener('click', () => {
+                overlay.classList.add('open');
+                loadChat();
+                localStorage.setItem(CHAT_KEY, "1");
+            });
+
+            // Close
+            closeBtn.addEventListener('click', () => {
+                overlay.classList.remove('open');
+            });
+
+            // Outside click
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.remove('open');
+            });
+
+            // ESC key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') overlay.classList.remove('open');
+            });
+
+            // Auto-open returning users (SaaS feel)
+            if (localStorage.getItem(CHAT_KEY)) {
+                setTimeout(() => {
+                    overlay.classList.add('open');
+                    loadChat();
+                }, 1500);
+            }
+        })();
+    </script>
+    {% endif %}
 </body>
+
 </html>

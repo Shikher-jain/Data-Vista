@@ -61,7 +61,7 @@
                 <input type="number" class="form-control" id="min_answer_len" name="min_answer_len" min="0" max="3000" value="{{ min_answer_len }}">
             </div>
             <div class="col-md-8 d-flex align-items-end">
-                <small class="text-muted">LLM cleanup uses GROQ_API_KEY from server environment variables.</small>
+                <small class="text-muted">LLM cleanup uses LLM_API_KEY from server environment variables.</small>
             </div>
         </div>
 
@@ -81,7 +81,7 @@
             <div class="col-md-4">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="use_llm_cleanup" name="use_llm_cleanup" value="true" {% if use_llm_cleanup %}checked{% endif %}>
-                    <label class="form-check-label" for="use_llm_cleanup">Use LLM Cleanup (Groq)</label>
+                    <label class="form-check-label" for="use_llm_cleanup">Use LLM Cleanup</label>
                 </div>
             </div>
         </div>
