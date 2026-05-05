@@ -77,7 +77,8 @@ def update_list():
         listbox.insert(tk.END, "No students found")
         return
     for name, grade in student_grades.items():
-        listbox.insert(tk.END, f"{name}: {grade}")
+        numeric_grade = float(grade)
+        listbox.insert(tk.END, f"{name}: {numeric_grade:g}/100 = {numeric_grade / 100:g}")
 
 # --- UI Setup ---
 root = tk.Tk()

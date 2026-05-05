@@ -75,6 +75,15 @@ elif choice == "View Students":
     st.subheader("📋 Student List")
 
     if student_grades:
-        st.table([{"Name": name, "Grade": grade} for name, grade in student_grades.items()])
+        st.table(
+            [
+                {
+                    "Name": name,
+                    "Marks": f"{float(grade):g}/100",
+                    "Decimal Result": f"{float(grade) / 100:g}",
+                }
+                for name, grade in sorted(student_grades.items())
+            ]
+        )
     else:
         st.info("No students found")
