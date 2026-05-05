@@ -27,6 +27,7 @@ class DataVistaStore:
                 CREATE TABLE IF NOT EXISTS students (
                     name TEXT PRIMARY KEY,
                     grade REAL NOT NULL,
+                    range_upper REAL NOT NULL DEFAULT 10,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
@@ -46,8 +47,32 @@ class DataVistaStore:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_gdp_country_name ON gdp_data(country_name)")
             conn.commit()
 
+        self._ensure_student_range_upper_column()
+
         self._migrate_students_json_if_needed()
         self._seed_gdp_if_needed()
+
+    def _ensure_student_range_upper_column(self) -> None:
+        with self._connect() as conn:
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(students)").fetchall()}
+            if "range_upper" in columns:
+                return
+
+            conn.execute("ALTER TABLE students ADD COLUMN range_upper REAL NOT NULL DEFAULT 10")
+            conn.execute(
+                """
+                UPDATE students
+                SET range_upper = CASE
+                    WHEN grade > 10 THEN 100.0
+                    ELSE 10.0
+                END
+                """
+            )
+            conn.commit()
+
+    @staticmethod
+    def _default_range_upper(grade: float) -> float:
+        return 100.0 if float(grade) > 10 else 10.0
 
     def _migrate_students_json_if_needed(self) -> None:
         if not self.students_json_path.exists():
@@ -75,7 +100,7 @@ class DataVistaStore:
                 numeric_grade = float(grade)
             except (TypeError, ValueError):
                 continue
-            records.append((key, numeric_grade))
+            records.append((key, numeric_grade, self._default_range_upper(numeric_grade)))
 
         if not records:
             return
@@ -83,10 +108,11 @@ class DataVistaStore:
         with self._connect() as conn:
             conn.executemany(
                 """
-                INSERT INTO students (name, grade)
-                VALUES (?, ?)
+                INSERT INTO students (name, grade, range_upper)
+                VALUES (?, ?, ?)
                 ON CONFLICT(name) DO UPDATE SET
                     grade = excluded.grade,
+                    range_upper = excluded.range_upper,
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 records,
@@ -146,24 +172,40 @@ class DataVistaStore:
 
     def list_students(self) -> List[Dict[str, float]]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT name, grade FROM students ORDER BY LOWER(name)").fetchall()
-        return [{"name": row["name"], "grade": float(row["grade"])} for row in rows]
+            rows = conn.execute("SELECT name, grade, range_upper FROM students ORDER BY LOWER(name)").fetchall()
+        return [
+            {
+                "name": row["name"],
+                "grade": float(row["grade"]),
+                "range_upper": float(row["range_upper"] if row["range_upper"] is not None else self._default_range_upper(row["grade"])),
+            }
+            for row in rows
+        ]
 
-    def upsert_student(self, name: str, grade: float) -> None:
+    def upsert_student(self, name: str, grade: float, range_upper: float = 10.0) -> None:
         key = name.strip()
         if not key:
             raise ValueError("Student name cannot be empty.")
 
+        try:
+            range_value = float(range_upper)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Student range upper bound must be a valid number.") from exc
+
+        if range_value <= 0:
+            raise ValueError("Student range upper bound must be greater than zero.")
+
         with self._connect() as conn:
             conn.execute(
                 """
-                INSERT INTO students (name, grade)
-                VALUES (?, ?)
+                INSERT INTO students (name, grade, range_upper)
+                VALUES (?, ?, ?)
                 ON CONFLICT(name) DO UPDATE SET
                     grade = excluded.grade,
+                    range_upper = excluded.range_upper,
                     updated_at = CURRENT_TIMESTAMP
                 """,
-                (key, float(grade)),
+                (key, float(grade), range_value),
             )
             conn.commit()
 
